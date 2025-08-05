@@ -169,12 +169,12 @@ def add_editor_buttons(buttons, editor):
         )
         buttons.append(examples_button)
         
-        # TTS button with icon (right)
+        # TTS button
         tts_button = editor._addButton(
             icon=None,
             cmd="inferanki_tts", 
             tip="TTS",
-            label="👩🏼",  # icon - Norwegian voice from Bergen
+            label="👩🏼",
             id="inferanki_tts",
             toggleable=False,
             disables=False

@@ -1,5 +1,7 @@
 # InferAnki
 
+**Norwegian Language Learning Add-on for Anki with AI-powered features**
+
 ## Installation Steps
 
 1. Copy the entire inferanki folder to: `%APPDATA%\Anki2\addons21\`
@@ -24,12 +26,12 @@
 
 ## Usage
 
-1. Open Anki card editor (Add/Edit card)
+1. Open the Anki card editor (Add/Edit card)
 2. Use the toolbar buttons:
-   - ✨ CardCraft: Word analysis and generation of word stack, definitions and usage examples
+   - ✨ CardCraft: Word analysis and generation of word stack, definitions, and usage examples
    - 📝 Examples: Generate additional examples from existing content in field 2
    - 👩🏼 TTS: Text-to-speech for Norwegian text
-   - ☀️ChatGPT Assistant: Chat with AI assistant configured to help with language learning
+   - ☀️ChatGPT Assistant: Chat with an AI assistant configured to help with language learning
 
 ## Configuration
 
@@ -78,7 +80,7 @@ To personalize the Norwegian language ChatBot assistant:
 
 **Configuration Ideas:**
 - Use specific instructions in system_message
-- Specify desired response language
+- Specify the desired response language
 - Indicate your Norwegian level for complexity adaptation
 - For advanced users: "Du er en norsk språkekspert. Svar på norsk med detaljerte forklaringer. Fokuser på nyanser, dialekter og kulturelle aspekter."
 - For specialized fields: "You are a Norwegian teacher specializing in business/medical/technical Norwegian. Focus on professional vocabulary and formal language patterns."
