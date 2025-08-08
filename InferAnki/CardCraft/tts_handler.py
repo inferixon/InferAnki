@@ -72,7 +72,7 @@ class ElevenLabsTTSProcessor:
         if self.voice_name in self.norwegian_voices:
             self.voice_id = self.norwegian_voices[self.voice_name]
         elif not self.voice_id:
-            self.voice_id = self.norwegian_voices["Emma"]  # Default
+            self.voice_id = self.norwegian_voices["Emma"]  # Default to Emma from Bergen
           # Check API availability
         if not REQUESTS_AVAILABLE:
             showCritical("ElevenLabs TTS requires 'requests' library")

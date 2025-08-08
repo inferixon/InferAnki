@@ -66,7 +66,7 @@
     "norwegian_examples_sentences": {
       "description": "Lag 3–5 fullstendige, naturlige norske setninger for hver ordform i stakket, brukt i realistiske kontekster. Setningene kan være dialog, utdrag fra fagtekst eller andre naturlige sammenhenger.",
       "system_message": "Du er en ekspert på norsk språk og naturlig språkbruk. For hver ordform i det gitte ordstakket, lag 1-2 fullstendige, naturlige norske setninger som demonstrerer ordformen i en realistisk kontekst. Velg setninger slik at samlingen totalt gir MAKSIMAL informasjonsverdi om ordets bruk: både de vanligste betydningene og viktige nyanser, idiomatisk bruk, ulike kontekster (faglig, dagligtale, etc).Varier med flertal og passiv form. Dersom 'user_context' er oppgitt, skal setningene gjenspeile dette så langt det er naturlig mulig. Setningene skal være klare, relevante og naturlige, aldri kunstige eller konstruerte. Ikke bruk ordene fra user_context som påtvungne detaljer - la konteksten influere situasjonen naturlig. Ordformen fra stakket skal markeres med fet skrift (**ord**). Hvis formen er null, ikke generer noe. Returner bare setningene, ingen overskrifter eller forklaringer.",
-      "user_context": [],
+      "user_context": ["vitenskap", "kodekraft", "3d tegning bransje"],
       "user_template": "Lag naturlige norske setninger for dette ordstakket:\n\n{word_stack_json}\n\nUser context: {user_context}\n\nFormat: 1-2 fullstendige setninger per ordform der ordformen står i fet skrift (**ord**). Setningene skal være enkle, naturlige og hverdagslige.",
       "api_settings": {
         "model": "gpt-4.1",
@@ -84,7 +84,7 @@
     "norwegian_examples_from_content": {
       "description": "Generate 3-5 short, natural Norwegian example sentences from existing content to demonstrate practical usage.",
       "system_message": "Du er en ekspert på norsk språk og naturlig språkbruk. Du får innhold fra et norsk språkopplæringskort og skal lage 3-5 korte, naturlige eksempelsetninger som demonstrerer hvordan ordene/uttrykkene i innholdet brukes i praktiske sammenhenger. Velg setninger slik at samlingen totalt gir MAKSIMAL informasjonsverdi om ordets bruk: både de vanligste betydningene og viktige nyanser, idiomatisk bruk, ulike kontekster (faglig, dagligtale, etc). Varier med flertal og passiv form. Dersom 'user_context' er oppgitt, skal setningene gjenspeile dette tematisk og situasjonelt. Eksemplene skal være naturlige uten kunstig innsetting av kontekstord. Setningene skal være: korte og enkle å forstå, naturlige og hverdagslige, vise praktisk bruk av ord/uttrykk fra innholdet. Marker ord/uttrykk fra det oppgitte innholdet med fet skrift (**ord**). VIKTIG: Ikke bruk ordene direkte fra user_context som påtvungne detaljer - la konteksten influere situasjonen naturlig. IKKE bruk nummerering eller kulepunkter. Returner bare setningene, hver på egen linje, ingen overskrifter eller forklaringer.",
-      "user_context": [],
+      "user_context": ["vitenskap", "kodekraft", "kunstig intelligens", "3d tegning bransje"],
       "user_template": "Lag 3-5 korte eksempelsetninger basert på dette norske innholdet:\n\n{content}\n\nBruk brukerens kontekst for situasjonsveiledning (IKKE tving inn disse ordene): {user_context}\n\nSetningene skal vise naturlig bruk av hovedordene/uttrykkene fra innholdet. Bruk konteksten for å forme realistiske situasjoner, men ikke tving inn kontekstordene direkte. Skriv setningene uten nummerering, hver på egen linje.",
       "api_settings": {
         "model": "gpt-4.1",
