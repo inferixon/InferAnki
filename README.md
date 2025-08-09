@@ -1,4 +1,4 @@
-# InferAnki
+# InferAnki ![Version](https://img.shields.io/badge/version-0.6.2-blue)
 
 **Norwegian Language Learning Add-on for Anki with AI-powered features**
 
@@ -52,7 +52,7 @@ To change field 1 language to another language (e.g., Ukrainian), simply edit co
 }
 ```
 
-**Available languages:** Any language, even Klingon. The add-on automatically uses field indexes—custom field names in Anki do not matter!
+**Available languages:** Any language, even Klingon. The add-on automatically uses field indexes – custom field names in Anki do not matter!
 
 ### AI Context Configuration
 
