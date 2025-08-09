@@ -566,7 +566,7 @@ def handle_cardcraft_analysis(editor):
             insert_analysis_into_editor(editor, formatted_norwegian, "field_2")
             
             # Step 2: Translate to English and insert into field 1 (English)
-            english_result = WORD_ANALYZER.translate_to_english(result)
+            english_result = WORD_ANALYZER.translate_to_language(result)
             
             # Log Step 2
             log_cardcraft_step("STEP2_ENGLISH_TRANSLATION", word, {"input": result, "result": english_result})

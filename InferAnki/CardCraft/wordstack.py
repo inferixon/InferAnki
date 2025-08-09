@@ -255,7 +255,7 @@ class NorwegianWordAnalyzer:
             showCritical(f"❌ Test error: {e}")
             return False
             
-    def translate_to_english(self, norwegian_json: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+    def translate_to_language(self, norwegian_json: Dict[str, Any]) -> Optional[Dict[str, Any]]:
         """Translate Norwegian word forms JSON to target language from config"""
         try:
             if not self.openai_client.enabled:
