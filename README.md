@@ -38,22 +38,21 @@
 Edit config.json to configure:
 - TTS voice settings
 - AI model settings
-- Field names
+- Translation language
 - Debug mode
 
 ### Field 1 Language Configuration
 
 By default, AI generates translations in field 1 in English.
-To change field 1 language to another language (e.g., Ukrainian), simply edit config.json.
-Open config.json and replace these 2 fields:
+To change field 1 language to another language (e.g., Ukrainian), simply edit config.json. Open config.json and replace this field:
 
 ```json
 {
-    "field_1_language_code": "uk",
-    "field_1_name": "Ukrainian",
-    "field_2_name": "Norsk"
+    "field_1_response_lang": "Ukrainian"
 }
 ```
+
+**Available languages:** Any language, even Klingon. The add-on automatically uses field indexes—custom field names in Anki do not matter!
 
 ### AI Context Configuration
 

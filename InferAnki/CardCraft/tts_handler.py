@@ -34,7 +34,7 @@ class ElevenLabsTTSProcessor:
         self.language = config.get("tts_language", "nor")  # Norwegian ISO 639-3 code
         self.enabled = config.get("tts_enabled", True)
         self.max_chars = config.get("tts_max_chars", 40000)  # Flash v2.5 supports 40,000 chars
-        self.field_name = config.get("tts_field_name", "Norsk")
+        self.field_index = 1  # Always use field index 1 (second field) for TTS
         
         # ElevenLabs TTS configuration
         self.api_key = config.get("elevenlabs_api_key", "")
@@ -253,12 +253,11 @@ class ElevenLabsTTSProcessor:
             showCritical(f"Error creating ElevenLabs TTS audio: {str(e)}")
             return None
     
-    def get_field_content(self, editor, field_name):
-        """Get raw HTML content from specific field"""
+    def get_field_content(self, editor):
+        """Get raw HTML content from field index 1 (second field)"""
         try:
-            if hasattr(editor, 'note') and editor.note:
-                if field_name in editor.note:
-                    return editor.note[field_name]
+            if hasattr(editor, 'note') and editor.note and len(editor.note.fields) > 1:
+                return editor.note.fields[1]  # Field index 1 (second field)
             return ""
         except Exception as e:
             if self.config.get("debug_mode", False):
@@ -332,11 +331,11 @@ class ElevenLabsTTSProcessor:
             return False
             
         try:
-            # Get text from specified field
-            text = self.get_field_content(editor, self.field_name)
+            # Get text from field index 1 (second field)
+            text = self.get_field_content(editor)
             
             if not text or not text.strip():
-                showInfo(f"Field '{self.field_name}' is empty. Please add text to generate TTS audio.")
+                showInfo(f"Field 2 (index 1) is empty. Please add text to generate TTS audio.")
                 return False
                 
             # Check character limit

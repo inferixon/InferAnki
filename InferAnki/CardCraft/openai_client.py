@@ -24,13 +24,39 @@ class OpenAIClient:
     def __init__(self, config):
         self.config = config
         self.api_key = config.get("openai_api_key", "")
-        self.model = config.get("openai_model", "gpt-4")
+        self.model = config.get("openai_default_model", "gpt-4.1")  # Use default_model as fallback
         self.temperature = config.get("ai_temperature", 0.3)
         self.max_tokens = config.get("ai_max_tokens", 1500)
         self.base_url = "https://api.openai.com/v1"
         
         # Check availability
         self.enabled = self._check_availability()
+    
+    def _prepare_request_data(self, messages, custom_model=None, custom_temperature=None, custom_max_tokens=None):
+        """Prepare request data with model-specific parameters"""
+        model = custom_model or self.model
+        temperature = custom_temperature if custom_temperature is not None else self.temperature
+        max_tokens = custom_max_tokens or self.max_tokens
+        
+        data = {
+            "model": model,
+            "messages": messages
+        }
+        
+        # Handle different parameter formats for different model families
+        if "gpt-5" in model.lower():
+            # GPT-5 uses max_completion_tokens and may have temperature restrictions
+            data["max_completion_tokens"] = max_tokens
+            if model == "gpt-5-chat-latest":
+                # Only gpt-5-chat-latest supports custom temperature
+                data["temperature"] = temperature
+            # Other GPT-5 models use default temperature (1.0)
+        else:
+            # GPT-4 and older models use standard parameters
+            data["max_tokens"] = max_tokens
+            data["temperature"] = temperature
+        
+        return data
     
     def _check_availability(self):
         """Check if OpenAI is configured"""
@@ -78,16 +104,14 @@ class OpenAIClient:
         if not self.enabled:
             return {"success": False, "error": "OpenAI not configured (check API key)"}
         
-        # Prepare request data
-        data = {
-            "model": self.model,
-            "messages": [
-                {"role": "system", "content": "You are a helpful assistant."},
-                {"role": "user", "content": "Say hello in one word."}
-            ],
-            "temperature": self.temperature,
-            "max_tokens": 10
-        }
+        # Prepare messages
+        messages = [
+            {"role": "system", "content": "You are a helpful assistant."},
+            {"role": "user", "content": "Say hello in one word."}
+        ]
+        
+        # Use _prepare_request_data with custom max_tokens for quick test
+        data = self._prepare_request_data(messages, custom_max_tokens=10)
         
         result = self._make_request("chat/completions", data)
         
@@ -121,20 +145,15 @@ class OpenAIClient:
         # Add the actual user prompt
         messages.append({"role": "user", "content": prompt})
         
-        # Prepare request data
-        data = {
-            "model": self.model,
-            "messages": messages,
-            "temperature": self.temperature,
-            "max_tokens": self.max_tokens
-        }
+        # Use _prepare_request_data to handle model-specific parameters
+        data = self._prepare_request_data(messages)
         
         result = self._make_request("chat/completions", data)
         
         if result["success"]:
             try:
                 message = result["data"]["choices"][0]["message"]["content"]
-                return message.strip()
+                return message.strip() if message else None
             except (KeyError, IndexError):
                 return None
         else:

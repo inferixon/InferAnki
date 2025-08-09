@@ -1,12 +1,12 @@
 {
-    "name": "InferAnki", 
-    "mod": 1718366400,
-    "min_point_version": 45,
-    "max_point_version": 0,
-    "branch_index": 0,
-    "disabled": false,    
-    "conflicts": [],    
-    "human_version": "0.6",
-    "dev_version": "0.6.1",
-    "update_enabled": true
+  "name": "InferAnki",
+  "mod": 1718366400,
+  "min_point_version": 45,
+  "max_point_version": 0,
+  "branch_index": 0,
+  "disabled": false,
+  "conflicts": [],
+  "human_version": "0.6",
+  "dev_version": "0.6.2",
+  "update_enabled": true
 }

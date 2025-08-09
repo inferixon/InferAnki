@@ -263,7 +263,7 @@ class NorwegianWordAnalyzer:
                 return None
             
             # Get target language from config
-            target_language = self.config.get("field_1_name", "English")
+            target_language = self.config.get("field_1_response_lang", "English")
             
             # Get translator prompt
             translator_prompt = self.prompts.get("english_word_stack", {})

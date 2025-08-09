@@ -243,16 +243,8 @@ def is_norsk_field_available(editor):
         # Find Norsk field
         norsk_field_index = None
         
-        # Try to find field by name first
-        model = editor.note.model()
-        if model and 'flds' in model:
-            for i, field in enumerate(model['flds']):
-                field_name = field['name']
-                if field_name.lower() == CONFIG.get("field_2_name", "Norsk").lower():
-                    norsk_field_index = i
-                    break
-        
-        # If not found by name, use index 1 (second field)
+        # Use field index 1 (second field) for Norsk content
+        norsk_field_index = 1
         if norsk_field_index is None:
             norsk_field_index = 1
         
@@ -546,7 +538,7 @@ def handle_cardcraft_analysis(editor):
         selected_text = get_selected_text_from_editor(editor)
         
         if not selected_text:
-            showInfo(f"⚠️ No word found for analysis in '{CONFIG.get('field_2_name', 'Norsk')}' field.\nAdd a word and try again.")
+            showInfo(f"⚠️ No word found for analysis in 'Norsk' field.\nAdd a word and try again.")
             enable_cardcraft_button(editor)
             return
         
@@ -571,7 +563,7 @@ def handle_cardcraft_analysis(editor):
         if result:
             # Step 1: Format Norwegian analysis and insert into field 2 (Norsk)
             formatted_norwegian = format_analysis_result(result)
-            insert_analysis_into_editor(editor, formatted_norwegian, CONFIG.get("field_2_name", "Norsk"))
+            insert_analysis_into_editor(editor, formatted_norwegian, "field_2")
             
             # Step 2: Translate to English and insert into field 1 (English)
             english_result = WORD_ANALYZER.translate_to_english(result)
@@ -581,7 +573,7 @@ def handle_cardcraft_analysis(editor):
             
             if english_result:
                 formatted_english = format_analysis_result(english_result)
-                insert_analysis_into_editor(editor, formatted_english, CONFIG.get("field_1_name", "English"))
+                insert_analysis_into_editor(editor, formatted_english, "field_1")
                 
                 # Step 3: Get Norwegian word description and add to Norsk field
                 description_list = WORD_ANALYZER.get_description(formatted_norwegian)
@@ -651,16 +643,8 @@ def get_selected_text_from_editor(editor):
         norsk_field_index = None
         
         if hasattr(editor, 'note') and editor.note:
-            # Try to find field by name
-            model = editor.note.model()
-            if model and 'flds' in model:
-                for i, field in enumerate(model['flds']):
-                    field_name = field['name']
-                    if field_name.lower() == CONFIG.get("field_2_name", "Norsk").lower():
-                        norsk_field_index = i
-                        break
-            
-            # If not found by name, try index 1 (second field)
+            # Use field index 1 (second field) for Norsk content
+            norsk_field_index = 1
             if norsk_field_index is None:
                 norsk_field_index = 1
             
@@ -782,16 +766,16 @@ def format_analysis_result(analysis):
     
     return "<br>".join(lines)
 
-def insert_analysis_into_editor(editor, formatted_text, field_name="Norsk"):
+def insert_analysis_into_editor(editor, formatted_text, field_name="field_2"):
     """Insert analysis result into specified field, clearing it first"""
     try:
-        # Determine field index based on field name
-        field_index = 1  # Default to field 2
+        # Simple index-based field selection
+        field_index = 1  # Default to field 2 (second field)
         
-        if field_name.lower() == CONFIG.get("field_1_name", "English").lower():
-            field_index = 0  # Field 1 (configurable)
-        elif field_name.lower() == CONFIG.get("field_2_name", "Norsk").lower():
-            field_index = 1  # Field 2 (configurable)
+        if field_name == "field_1":
+            field_index = 0  # Field 1 (first field) - for translations
+        else:
+            field_index = 1  # Field 2 (second field) - for everything else
         
         # Use Anki's standard way to set field content
         if hasattr(editor, 'note') and editor.note and len(editor.note.fields) > field_index:
@@ -830,13 +814,13 @@ def get_field_content(editor, field_name):
         if not hasattr(editor, 'note') or not editor.note:
             return ""
         
-        # Determine field index based on field name
-        field_index = 1  # Default to field 2
+        # Simple index-based field selection
+        field_index = 1  # Default to field 2 (second field)
         
-        if field_name.lower() == CONFIG.get("field_1_name", "English").lower():
-            field_index = 0  # Field 1 (configurable)
-        elif field_name.lower() == CONFIG.get("field_2_name", "Norsk").lower():
-            field_index = 1  # Field 2 (configurable)
+        if field_name == "field_1":
+            field_index = 0  # Field 1 (first field) - for translations
+        else:
+            field_index = 1  # Field 2 (second field) - for everything else
         
         # Get field content
         if len(editor.note.fields) > field_index:
@@ -932,14 +916,7 @@ def handle_examples_command(editor):
             updated_content = norsk_content + "<br><br>" + examples
             
             # Find Norsk field index and update it
-            norsk_field_index = 1  # Default to field 2 (Norsk)
-            model = note.model()
-            if model and 'flds' in model:
-                for i, field in enumerate(model['flds']):
-                    field_name = field['name']
-                    if field_name.lower() == CONFIG.get("field_2_name", "Norsk").lower():
-                        norsk_field_index = i
-                        break
+            norsk_field_index = 1  # Use field index 1 (second field)
             
             # Update the field
             if len(note.fields) > norsk_field_index:
@@ -992,18 +969,52 @@ def generate_examples_from_content(content):
         # Get system message
         system_message = examples_prompt.get("system_message", "")
         
-        # Update OpenAI client settings
+        # Update OpenAI client settings from api_settings
         api_settings = examples_prompt.get("api_settings", {})
         if api_settings:
-            WORD_ANALYZER.openai_client.model = api_settings.get("model", "gpt-4")
-            WORD_ANALYZER.openai_client.temperature = api_settings.get("temperature", 0.3)
-            WORD_ANALYZER.openai_client.max_tokens = api_settings.get("max_tokens", 400)
-
-        # Use WORD_ANALYZER's OpenAI client for the request
-        response = WORD_ANALYZER.openai_client.simple_request(
-            user_message, 
-            system_message
-        )
+            # Extract settings with fallbacks
+            custom_model = api_settings.get("model", WORD_ANALYZER.openai_client.model)
+            custom_temperature = api_settings.get("temperature", WORD_ANALYZER.openai_client.temperature)
+            # Handle both old and new token parameter names
+            custom_max_tokens = api_settings.get("max_completion_tokens") or api_settings.get("max_tokens", WORD_ANALYZER.openai_client.max_tokens)
+            
+            # Build messages manually for custom parameters
+            messages = [{"role": "system", "content": system_message}]
+            messages.append({"role": "user", "content": user_message})
+            
+            # Use _prepare_request_data with custom parameters
+            data = WORD_ANALYZER.openai_client._prepare_request_data(
+                messages, 
+                custom_model=custom_model,
+                custom_temperature=custom_temperature, 
+                custom_max_tokens=custom_max_tokens
+            )
+            
+            # Handle response_format if specified (for JSON responses)
+            response_format = api_settings.get("response_format")
+            if response_format:
+                data["response_format"] = response_format
+            
+            # Make request directly
+            result = WORD_ANALYZER.openai_client._make_request("chat/completions", data)
+            
+            if result["success"]:
+                try:
+                    response = result["data"]["choices"][0]["message"]["content"]
+                    if response:
+                        response = response.strip()
+                    else:
+                        raise Exception("Empty response content")
+                except (KeyError, IndexError) as e:
+                    raise Exception(f"Invalid response format: {e}")
+            else:
+                raise Exception(f"OpenAI request failed: {result['error']}")
+        else:
+            # Fallback to simple_request for backward compatibility
+            response = WORD_ANALYZER.openai_client.simple_request(
+                user_message, 
+                system_message
+            )
         
         if not response:
             raise Exception("No response from OpenAI")
