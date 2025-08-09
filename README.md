@@ -1,4 +1,4 @@
-# InferAnki ![Version](https://img.shields.io/badge/version-0.6.2-blue)
+# InferAnki v0.6.3
 
 **Norwegian Language Learning Add-on for Anki with AI-powered features**
 
