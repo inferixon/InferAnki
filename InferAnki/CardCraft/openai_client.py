@@ -160,3 +160,40 @@ class OpenAIClient:
             if self.config.get("debug_mode", False):
                 showCritical(f"OpenAI request failed: {result['error']}")
             return None
+    
+    def simple_request_with_usage(self, prompt, system_message="You are a helpful assistant.", examples=None):
+        """Make a simple request to OpenAI with optional few-shot examples, return response and usage info"""
+        if not self.enabled:
+            return None, None
+        
+        # Build messages list
+        messages = [{"role": "system", "content": system_message}]
+        
+        # Add few-shot examples if provided
+        if examples:
+            for example in examples:
+                if isinstance(example, dict) and "user" in example and "assistant" in example:
+                    messages.append({"role": "user", "content": example["user"]})
+                    messages.append({"role": "assistant", "content": example["assistant"]})
+        
+        # Add the actual user prompt
+        messages.append({"role": "user", "content": prompt})
+        
+        # Use _prepare_request_data to handle model-specific parameters
+        data = self._prepare_request_data(messages)
+        
+        result = self._make_request("chat/completions", data)
+        
+        if result["success"]:
+            try:
+                response_data = result["data"]
+                message = response_data["choices"][0]["message"]["content"]
+                usage_info = response_data.get("usage", {})
+                
+                return message.strip() if message else None, usage_info
+            except (KeyError, IndexError):
+                return None, None
+        else:
+            if self.config.get("debug_mode", False):
+                showCritical(f"OpenAI request failed: {result['error']}")
+            return None, None

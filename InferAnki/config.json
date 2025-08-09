@@ -1,6 +1,7 @@
 {
   "debug_mode": true,
   "field_1_response_lang": "English",
+  "user_lang": "Ukrainian",
   "tts_engine": "elevenlabs",
   "tts_enabled": true,
   "tts_voice": "Emma",

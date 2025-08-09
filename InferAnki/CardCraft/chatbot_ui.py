@@ -26,17 +26,21 @@ except ImportError:
 
 class ChatWorker(QThread):
     """Worker thread for ChatGPT API calls"""
-    response_ready = pyqtSignal(str)
+    response_ready = pyqtSignal(str, dict)  # response, metadata
     error_occurred = pyqtSignal(str)
     
-    def __init__(self, message, config, prompts):
+    def __init__(self, message, config, prompts, max_tokens=None):
         super().__init__()
         self.message = message
         self.config = config
         self.prompts = prompts
+        self.custom_max_tokens = max_tokens
         
     def run(self):
         """Execute ChatGPT API call in background thread"""
+        import time
+        start_time = time.time()
+        
         try:
             if not OPENAI_AVAILABLE or not OpenAIClient:
                 self.error_occurred.emit("OpenAI client not available")
@@ -59,13 +63,23 @@ class ChatWorker(QThread):
             if api_settings:
                 openai_client.model = api_settings.get("model", "gpt-4")
                 openai_client.temperature = api_settings.get("temperature", 0.7)
-                openai_client.max_tokens = api_settings.get("max_tokens", 2000)
+                # Use custom max_tokens if provided, otherwise use from api_settings
+                max_tokens = self.custom_max_tokens if self.custom_max_tokens else api_settings.get("max_tokens", 2000)
+                openai_client.max_tokens = max_tokens
             
-            # Make API request
-            response = openai_client.simple_request(self.message, system_message)
+            # Make API request with usage info
+            response, usage_info = openai_client.simple_request_with_usage(self.message, system_message)
+            
+            # Calculate response time
+            response_time = time.time() - start_time
             
             if response:
-                self.response_ready.emit(response)
+                # Prepare metadata
+                metadata = {
+                    "response_time": response_time,
+                    "usage": usage_info or {}
+                }
+                self.response_ready.emit(response, metadata)
             else:
                 self.error_occurred.emit("No response from ChatGPT")
                 
@@ -108,6 +122,63 @@ class ChatBotDialog(QDialog):
                 showCritical(f"Error loading prompts: {e}")
         return {}
     
+    def setup_quick_prompts(self, layout):
+        """Setup quick prompt buttons"""
+        # Get quick prompts from chatbot config
+        chatbot_config = self.prompts.get("chatbot", {})
+        quick_prompts = chatbot_config.get("quick_prompts", {})
+        
+        if not quick_prompts:
+            return  # No quick prompts configured
+        
+        # Create horizontal layout for quick prompt buttons
+        quick_layout = QHBoxLayout()
+        
+        for prompt_id, prompt_config in quick_prompts.items():
+            button_text = prompt_config.get("button_text", prompt_id)
+            button = QPushButton(button_text)
+            button.setMaximumHeight(30)
+            button.clicked.connect(lambda checked, pid=prompt_id: self.execute_quick_prompt(pid))
+            quick_layout.addWidget(button)
+        
+        # Add stretch to push buttons to left
+        quick_layout.addStretch()
+        
+        layout.addLayout(quick_layout)
+    
+    def execute_quick_prompt(self, prompt_id):
+        """Execute a quick prompt with current input text"""
+        # Get current input text
+        expression = self.input_field.toPlainText().strip()
+        if not expression:
+            self.status_label.setText("Enter text first!")
+            self.status_label.setStyleSheet("color: red; font-size: 16px;")
+            return
+        
+        # Get prompt template
+        chatbot_config = self.prompts.get("chatbot", {})
+        quick_prompts = chatbot_config.get("quick_prompts", {})
+        prompt_config = quick_prompts.get(prompt_id)
+        
+        if not prompt_config:
+            self.status_label.setText(f"Prompt {prompt_id} not found!")
+            self.status_label.setStyleSheet("color: red; font-size: 16px;")
+            return
+        
+        # Format prompt with expression and user_lang
+        user_lang = self.config.get("user_lang", "Ukrainian")
+        prompt_template = prompt_config.get("prompt_template", "")
+        formatted_prompt = prompt_template.format(expression=expression, user_lang=user_lang)
+        
+        # Get max_completion_tokens for this specific prompt
+        max_tokens = prompt_config.get("max_completion_tokens")
+        
+        # Clear input field after sending quick prompt
+        self.input_field.clear()
+        
+        # Send formatted prompt with custom max_tokens
+        self.send_message_text(formatted_prompt, max_tokens)
+    
     def setup_ui(self):
         """Setup the chat interface"""
         layout = QVBoxLayout()
@@ -121,6 +192,9 @@ class ChatBotDialog(QDialog):
         self.chat_display.setFont(chat_font)
         
         layout.addWidget(self.chat_display)
+        
+        # Quick prompts buttons section
+        self.setup_quick_prompts(layout)
         
         # Input section
         input_layout = QHBoxLayout()
@@ -186,7 +260,7 @@ class ChatBotDialog(QDialog):
         layout.addLayout(input_layout)
           # Status label
         self.status_label = QLabel("Ready to help with Norwegian language!")
-        self.status_label.setStyleSheet("color: green; font-style: italic;")        
+        self.status_label.setStyleSheet("color: gray; font-size: 16px;")        
         layout.addWidget(self.status_label)
         
         self.setLayout(layout)
@@ -196,7 +270,7 @@ class ChatBotDialog(QDialog):
         
     def add_welcome_message(self):
         """Add welcome message to chat"""
-        welcome = "<h3>I'm your Norwegian language assistant!</h3><br>How can I help you?"
+        welcome = "Hei. Hvordan kan jeg hjelpe deg?"
         self.add_to_chat("☀️ ChatGPT", welcome)
         
     def test_connection(self):
@@ -216,6 +290,13 @@ class ChatBotDialog(QDialog):
     def send_message(self):
         """Handle sending user message"""
         user_message = self.input_field.toPlainText().strip()
+        if user_message:
+            self.send_message_text(user_message)
+            self.input_field.clear()
+    
+    def send_message_text(self, message_text, max_tokens=None):
+        """Send a specific message text"""
+        user_message = message_text.strip()
         
         if not user_message:
             return
@@ -224,14 +305,14 @@ class ChatBotDialog(QDialog):
         if not OPENAI_AVAILABLE or not OpenAIClient:
             self.add_to_chat("☀️ ChatGPT", "❌ OpenAI client not available. Please check your configuration.")
             return
-              # Check API key
+        
+        # Check API key
         api_key = self.config.get("openai_api_key", "")
         if not api_key or api_key == "YOUR_OPENAI_API_KEY_HERE":
             self.add_to_chat("☀️ ChatGPT", "❌ OpenAI API key not configured. Please add your API key to config.json.")
             return
         
-        # Clear input field and disable controls
-        self.input_field.clear()
+        # Disable controls during request
         self.input_field.setEnabled(False)
         self.send_button.setEnabled(False)
         
@@ -240,7 +321,7 @@ class ChatBotDialog(QDialog):
         
         # Update status
         self.status_label.setText("Thinking...")
-        self.status_label.setStyleSheet("color: orange; font-style: italic;")
+        self.status_label.setStyleSheet("color: orange; font-size: 16px;")
         
         # Add to chat history (limit to max_history)
         self.chat_history.append({"role": "user", "content": user_message})
@@ -248,13 +329,13 @@ class ChatBotDialog(QDialog):
             self.chat_history.pop(0)
         
         # Start worker thread for API call
-        self.worker_thread = ChatWorker(user_message, self.config, self.prompts)
+        self.worker_thread = ChatWorker(user_message, self.config, self.prompts, max_tokens)
         self.worker_thread.response_ready.connect(self.on_response_ready)
         self.worker_thread.error_occurred.connect(self.on_error_occurred)
         self.worker_thread.finished.connect(self.on_worker_finished)
         self.worker_thread.start()
         
-    def on_response_ready(self, response):
+    def on_response_ready(self, response, metadata):
         """Handle successful ChatGPT response"""
         self.add_to_chat("☀️ ChatGPT", response)
         
@@ -263,16 +344,27 @@ class ChatBotDialog(QDialog):
         if len(self.chat_history) > self.max_history:
             self.chat_history.pop(0)
             
-        # Update status
-        self.status_label.setText("Ready to help!")
-        self.status_label.setStyleSheet("color: green; font-style: italic;")
+        # Format usage and timing info
+        usage = metadata.get("usage", {})
+        response_time = metadata.get("response_time", 0)
+        
+        prompt_tokens = usage.get("prompt_tokens", 0)
+        completion_tokens = usage.get("completion_tokens", 0)
+        total_tokens = usage.get("total_tokens", 0)
+        
+        # Update status with usage info (like web ChatGPT)
+        status_text = f"Response time: {response_time:.1f}s"
+        if total_tokens > 0:
+            status_text += f" • Tokens: {prompt_tokens}↑ {completion_tokens}↓ = {total_tokens}"
+        self.status_label.setText(status_text)
+        self.status_label.setStyleSheet("color: gray; font-size: 16px;")
         
     def on_error_occurred(self, error_message):
         """Handle ChatGPT API errors"""
         self.add_to_chat("☀️ ChatGPT", f"❌ {error_message}")
           # Update status
         self.status_label.setText("Error occurred. Please try again.")
-        self.status_label.setStyleSheet("color: red; font-style: italic;")
+        self.status_label.setStyleSheet("color: red; font-size: 16px;")
         
     def on_worker_finished(self):
         """Re-enable controls when worker thread finishes"""

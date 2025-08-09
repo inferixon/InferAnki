@@ -6,7 +6,7 @@
     "api_settings": {
       "model": "gpt-5-chat-latest",
       "temperature": 0,
-      "max_completion_tokens": 3000,
+      "max_completion_tokens": 2000,
       "response_format": {
         "type": "json_object"
       }
@@ -40,7 +40,7 @@
     "api_settings": {
       "model": "gpt-5-chat-latest",
       "temperature": 0,
-      "max_completion_tokens": 3000,
+      "max_completion_tokens": 2000,
       "response_format": {
         "type": "json_object"
       }
@@ -65,7 +65,7 @@
     "api_settings": {
       "model": "gpt-5-chat-latest",
       "temperature": 0.5,
-      "max_completion_tokens": 3000
+      "max_completion_tokens": 2000
     },
     "examples": [
       {
@@ -82,7 +82,7 @@
     "api_settings": {
       "model": "gpt-5-chat-latest",
       "temperature": 0.7,
-      "max_completion_tokens": 4000
+      "max_completion_tokens": 2000
     },
     "examples": [
       {
@@ -100,7 +100,7 @@
     "api_settings": {
       "model": "gpt-5-chat-latest",
       "temperature": 0.7,
-      "max_completion_tokens": 4000
+      "max_completion_tokens": 2000
     },
     "examples": [
       {
@@ -117,7 +117,27 @@
     "api_settings": {
       "model": "gpt-5-chat-latest",
       "temperature": 0.7,
-      "max_completion_tokens": 4000
+      "max_completion_tokens": 800
+    },
+    "quick_prompts": {
+      "prompt_meaning": {
+        "description": "Explain the meaning of Norwegian expression with examples",
+        "button_text": "BETYDNINGEN",
+        "prompt_template": "Forklar på {user_lang} betydningen av uttrykket '{expression}' med enkle ord og gi 2–3 korte eksempler på norsk.",
+        "max_completion_tokens": 800
+      },
+      "prompt_difference": {
+        "description": "Explain difference between Norwegian expressions with examples",
+        "button_text": "FORSKJELLEN",
+        "prompt_template": "Forklar på {user_lang} forskjellen mellom {expression} med 2–3 eksempler på norsk og kommentarer.",
+        "max_completion_tokens": 1000
+      },
+      "prompt_synonyms_antonyms": {
+        "description": "Provide synonyms and antonyms for Norwegian word with nuances and examples",
+        "button_text": "SYNONYMER",
+        "prompt_template": "Gi synonymer og antonymer for det norske ordet '{expression}' med betydningsnyanser og eksempler på norsk med oversettelse til {user_lang}.",
+        "max_completion_tokens": 1200
+      }
     }
   }
 }
