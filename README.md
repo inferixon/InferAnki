@@ -2,21 +2,18 @@
 
 **Norwegian Language Learning Add-on for Anki with AI-powered features**
 
-
 ## Required API Keys
 
 ### OpenAI API Key
 - Go to: https://platform.openai.com/
-- Register/log into your account
+- Sign up or log in to your account
 - Create an API key in the API Keys section
 
 ### ElevenLabs API Key
 - Go to: https://try.elevenlabs.io/l8ypk48ku2uk
-- Register/log into your account
-- Get your API key in Account Settings
-- Copy it to the `elevenlabs_api_key` field in `config.json`
-- Select your desired voice
-- Copy the voice ID to the `elevenlabs_voice_id` field in `config.json`
+- Sign up or log in to your account
+- Create an API key in your account settings
+- Choose your preferred voice and save its voice ID
 
 ## Installation Steps
 
@@ -78,11 +75,9 @@ This makes AI examples more relevant to your field when learning Norwegian vocab
 
 **WARNING!** In this version, the Chatbot doesn't remember conversation context to save tokens. It only works in question ⇒ answer mode.
 
-
 ## Support
 
 - Check debug.log for issues
 - Enable debug_mode in config.json for detailed logging
-
 
 ### IMPORTANT! RESTART ANKI AFTER ANY CONFIGURATION CHANGES!!!
