@@ -44,22 +44,24 @@ Edit config.json to configure:
 ### Field 1 Language Configuration
 
 By default, AI generates translations in field 1 in English.
-To change field 1 language to another language (e.g., Ukrainian), simply edit config.json. Open config.json and replace this field:
+To change field 1 language to another language, simply edit config.json. Open config.json and replace this field:
 
 ```json
 {
-    "field_1_response_lang": "Ukrainian"
+    "field_1_response_lang": "Your Language"
 }
 ```
 
-**Available languages:** Any language, even Klingon. The add-on automatically uses field indexes – custom field names in Anki do not matter!
+**Available languages:** Any language, even Klingon.
+
+- **Note:** The add-on automatically uses field indexes in the code – so the field names in Anki do not affect anything!
 
 ### AI Context Configuration
 
 To personalize AI-generated examples for your field/interests:
 
 1. Open: CardCraft/ai_prompts.json
-2. Find: `"user_context": ["vitenskap", "kodekraft", "3d tegning bransje"]`
+2. Find: `"user_context": []`
 3. Replace with your context, for example:
    - Medicine: `["medisin", "helse", "sykehus"]`
    - Business: `["økonomi", "business", "ledelse"]`
@@ -83,9 +85,11 @@ To personalize the Norwegian language ChatBot assistant:
 - Indicate your Norwegian level for complexity adaptation
 - For advanced users: "Du er en norsk språkekspert. Svar på norsk med detaljerte forklaringer. Fokuser på nyanser, dialekter og kulturelle aspekter."
 - For specialized fields: "You are a Norwegian teacher specializing in business/medical/technical Norwegian. Focus on professional vocabulary and formal language patterns."
-- Add quick commands and descriptions. Example: "Handle these quick commands: *u [text] = translate [text] to Ukrainian, ..."
+- Add quick commands and descriptions. Example: "Handle these quick commands: *u [text] = translate [text] to your language, ..."
 - Experiment with "temperature" (0.0-1.0, higher = more creative responses)
 - Maximum response length "max_tokens" for token usage control
+
+📖 **Detailed Documentation:** See `ChatBot.md` for complete guide on configuring quick prompts, translation buttons, and clipboard copy functionality.
 
 > **WARNING!** In this version, the Chatbot doesn't remember conversation context to save tokens. It only works in question ⇒ answer mode.
 

@@ -1,8 +1,8 @@
 # ChatBot UI for InferAnki v0.6
 # Qt-based chat interface for Norwegian language assistance
 
-from PyQt6.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QTextEdit, QPushButton, QLabel)  # type: ignore
-from PyQt6.QtCore import Qt, QThread, pyqtSignal     # type: ignore
+from PyQt6.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QTextEdit, QPushButton, QLabel, QApplication)  # type: ignore
+from PyQt6.QtCore import Qt, QThread, pyqtSignal, QTimer     # type: ignore
 from PyQt6.QtGui import QFont, QKeySequence # type: ignore
 import json
 import os
@@ -123,7 +123,7 @@ class ChatBotDialog(QDialog):
         return {}
     
     def setup_quick_prompts(self, layout):
-        """Setup quick prompt buttons"""
+        """Setup quick prompt buttons with automatic wrapping"""
         # Get quick prompts from chatbot config
         chatbot_config = self.prompts.get("chatbot", {})
         quick_prompts = chatbot_config.get("quick_prompts", {})
@@ -131,20 +131,39 @@ class ChatBotDialog(QDialog):
         if not quick_prompts:
             return  # No quick prompts configured
         
-        # Create horizontal layout for quick prompt buttons
-        quick_layout = QHBoxLayout()
+        # Create vertical layout to contain multiple rows
+        quick_container = QVBoxLayout()
+        
+        # Create first row
+        current_row = QHBoxLayout()
+        buttons_in_row = 0
+        max_buttons_per_row = 4  # Adjust this number as needed
         
         for prompt_id, prompt_config in quick_prompts.items():
             button_text = prompt_config.get("button_text", prompt_id)
             button = QPushButton(button_text)
             button.setMaximumHeight(30)
+            button.setMinimumWidth(80)  # Minimum width for readability
             button.clicked.connect(lambda checked, pid=prompt_id: self.execute_quick_prompt(pid))
-            quick_layout.addWidget(button)
+            
+            # If current row is full, start a new row
+            if buttons_in_row >= max_buttons_per_row:
+                # Add stretch to current row and add it to container
+                current_row.addStretch()
+                quick_container.addLayout(current_row)
+                
+                # Create new row
+                current_row = QHBoxLayout()
+                buttons_in_row = 0
+            
+            current_row.addWidget(button)
+            buttons_in_row += 1
         
-        # Add stretch to push buttons to left
-        quick_layout.addStretch()
+        # Add stretch to last row and add it to container
+        current_row.addStretch()
+        quick_container.addLayout(current_row)
         
-        layout.addLayout(quick_layout)
+        layout.addLayout(quick_container)
     
     def execute_quick_prompt(self, prompt_id):
         """Execute a quick prompt with current input text"""
@@ -173,11 +192,14 @@ class ChatBotDialog(QDialog):
         # Get max_completion_tokens for this specific prompt
         max_tokens = prompt_config.get("max_completion_tokens")
         
+        # Get copy_to_clipboard flag
+        copy_to_clipboard = prompt_config.get("copy_to_clipboard", False)
+        
         # Clear input field after sending quick prompt
         self.input_field.clear()
         
-        # Send formatted prompt with custom max_tokens
-        self.send_message_text(formatted_prompt, max_tokens)
+        # Send formatted prompt with custom max_tokens and clipboard flag
+        self.send_message_text(formatted_prompt, max_tokens, copy_to_clipboard)
     
     def setup_ui(self):
         """Setup the chat interface"""
@@ -291,15 +313,18 @@ class ChatBotDialog(QDialog):
         """Handle sending user message"""
         user_message = self.input_field.toPlainText().strip()
         if user_message:
-            self.send_message_text(user_message)
+            self.send_message_text(user_message, copy_to_clipboard=False)
             self.input_field.clear()
     
-    def send_message_text(self, message_text, max_tokens=None):
+    def send_message_text(self, message_text, max_tokens=None, copy_to_clipboard=False):
         """Send a specific message text"""
         user_message = message_text.strip()
         
         if not user_message:
             return
+            
+        # Store clipboard flag for later use in response handler
+        self.current_copy_to_clipboard = copy_to_clipboard
             
         # Check OpenAI availability
         if not OPENAI_AVAILABLE or not OpenAIClient:
@@ -339,14 +364,48 @@ class ChatBotDialog(QDialog):
         """Handle successful ChatGPT response"""
         self.add_to_chat("☀️ ChatGPT", response)
         
+        # Copy to clipboard if requested
+        if hasattr(self, 'current_copy_to_clipboard') and self.current_copy_to_clipboard:
+            try:
+                clipboard = QApplication.clipboard()
+                clipboard.setText(response.strip())
+                # Visual feedback - briefly show copied status
+                self.status_label.setText("📋 Copied to clipboard!")
+                self.status_label.setStyleSheet("color: green; font-size: 16px;")
+                
+                # Reset status after 2 seconds
+                QTimer.singleShot(2000, self.restore_status)
+                
+            except Exception as e:
+                if ANKI_AVAILABLE:
+                    showCritical(f"Failed to copy to clipboard: {e}")
+            
+            # Reset the flag
+            self.current_copy_to_clipboard = False
+        
         # Add to chat history
         self.chat_history.append({"role": "assistant", "content": response})
         if len(self.chat_history) > self.max_history:
             self.chat_history.pop(0)
             
-        # Format usage and timing info
-        usage = metadata.get("usage", {})
-        response_time = metadata.get("response_time", 0)
+        # Store usage info for potential status restoration
+        self.last_usage = metadata
+        
+        # If no clipboard operation, show usage immediately
+        if not hasattr(self, 'current_copy_to_clipboard') or not self.current_copy_to_clipboard:
+            self.show_usage_status()
+    
+    def restore_status(self):
+        """Restore normal status after clipboard feedback"""
+        self.show_usage_status()
+        
+    def show_usage_status(self):
+        """Display usage and timing information"""
+        if not hasattr(self, 'last_usage'):
+            return
+            
+        usage = self.last_usage.get("usage", {})
+        response_time = self.last_usage.get("response_time", 0)
         
         prompt_tokens = usage.get("prompt_tokens", 0)
         completion_tokens = usage.get("completion_tokens", 0)
