@@ -13,20 +13,20 @@
 ### ElevenLabs API Key
 - Go to: https://try.elevenlabs.io/l8ypk48ku2uk
 - Register/log into your account
-- Create an API key in Account Settings
-- Select your desired voice and save its ID
+- Get your API key in Account Settings
+- Copy it to the `elevenlabs_api_key` field in `config.json`
+- Select your desired voice
+- Copy the voice ID to the `elevenlabs_voice_id` field in `config.json`
 
+## Кроки встановлення
 
-## Installation Steps
-
-1. Copy the entire inferanki folder to: `%APPDATA%\Anki2\addons21\`
-2. Open `config.json` and add your API keys:
-   - Paste the OpenAI API key to the `openai_api_key` field
-   - Paste the ElevenLabs API key to the `elevenlabs_api_key` field
-   - Paste the voice ID to the `elevenlabs_voice_id` field
-3. Restart Anki
-4. Configure fields 1 and 2 as shown in the images
-
+1. Скопіюйте всю папку inferanki до: `%APPDATA%\Anki2\addons21\`
+2. Відкрийте  `config.json` та додайте ваші API ключі:
+   - Скопіюйте API ключ від OpenAI в поле `openai_api_key`
+   - Скопіюйте API ключ від ElevenLabs в поле `elevenlabs_api_key`
+   - Скопіюйте id голосу в поле `elevenlabs_voice_id`
+3. Перезапустіть Anki
+4. Налаштуйте поля 1 і 2 як показано на малюнках
 
 ## Usage
 
