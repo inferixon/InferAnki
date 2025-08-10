@@ -2,65 +2,66 @@
 
 **Norwegian Language Learning Add-on for Anki with AI-powered features**
 
-## Installation Steps
-
-1. Copy the entire inferanki folder to: `%APPDATA%\Anki2\addons21\`
-2. Edit config.json and add your API keys
-3. Restart Anki
 
 ## Required API Keys
 
-### 1. OpenAI API Key
+### OpenAI API Key
 - Go to: https://platform.openai.com/
 - Register/log into your account
 - Create an API key in the API Keys section
-- Copy it to the `openai_api_key` field in `config.json`
 
-### 2. ElevenLabs API Key
+### ElevenLabs API Key
 - Go to: https://try.elevenlabs.io/l8ypk48ku2uk
 - Register/log into your account
-- Get your API key in Account Settings
-- Copy it to the `elevenlabs_api_key` field in `config.json`
-- Select your desired voice
-- Copy the voice ID to the `elevenlabs_voice_id` field in `config.json`
+- Create an API key in Account Settings
+- Select your desired voice and save its ID
+
+
+## Installation Steps
+
+1. Copy the entire inferanki folder to: `%APPDATA%\Anki2\addons21\`
+2. Open `config.json` and add your API keys:
+   - Paste the OpenAI API key to the `openai_api_key` field
+   - Paste the ElevenLabs API key to the `elevenlabs_api_key` field
+   - Paste the voice ID to the `elevenlabs_voice_id` field
+3. Restart Anki
+4. Configure fields 1 and 2 as shown in the images
+
 
 ## Usage
 
 1. Open the Anki card editor (Add/Edit card)
 2. Use the toolbar buttons:
-   - ✨ CardCraft: Word analysis and generation of word stack, definitions, and usage examples
+   - ✨ WordCraft: Word analysis and generation of word stack, definitions, and usage examples
    - 📝 Examples: Generate additional examples from existing content in field 2
    - 👩🏼 TTS: Text-to-speech for Norwegian text
-   - ☀️ChatGPT Assistant: Chat with an AI assistant configured to help with language learning
+   - ☀️ChatGPT Assistant: Chat with GPT-5 configured to help with language learning
 
 ## Configuration
 
-Edit config.json to configure:
+Edit `config.json` to configure:
 - TTS voice settings
 - AI model settings
 - Translation language
 - Debug mode
 
-### Field 1 Language Configuration
+### Translation Language Configuration - Field 1
 
-By default, AI generates translations in field 1 in English.
-To change field 1 language to another language, simply edit config.json. Open config.json and replace this field:
+By default, AI generates translations in field 1 in English. **Available languages:** Any language, even Klingon. To change field 1 language to another (e.g., Ukrainian), open `config.json` and replace:
 
 ```json
 {
-    "field_1_response_lang": "Your Language"
+    "field_1_response_lang": "Ukrainian"
 }
 ```
 
-**Available languages:** Any language, even Klingon.
+**Note:** The add-on automatically uses field indexes in the code – so the field names in Anki do not affect anything!
 
-- **Note:** The add-on automatically uses field indexes in the code – so the field names in Anki do not affect anything!
-
-### AI Context Configuration
+**Context Configuration**
 
 To personalize AI-generated examples for your field/interests:
 
-1. Open: CardCraft/ai_prompts.json
+1. Open: `prompts.json`
 2. Find: `"user_context": []`
 3. Replace with your context, for example:
    - Medicine: `["medisin", "helse", "sykehus"]`
@@ -73,29 +74,15 @@ This makes AI examples more relevant to your field when learning Norwegian vocab
 
 ### Chatbot Configuration
 
-To personalize the Norwegian language ChatBot assistant:
+**Detailed Documentation:** See `ChatBot.md` for configuring quick prompts, translation buttons, and clipboard copy functionality.
 
-1. Open: CardCraft/ai_prompts.json
-2. Find the "chatbot" section
-3. Configure system_message for desired behavior:
+**WARNING!** In this version, the Chatbot doesn't remember conversation context to save tokens. It only works in question ⇒ answer mode.
 
-**Configuration Ideas:**
-- Use specific instructions in system_message
-- Specify the desired response language
-- Indicate your Norwegian level for complexity adaptation
-- For advanced users: "Du er en norsk språkekspert. Svar på norsk med detaljerte forklaringer. Fokuser på nyanser, dialekter og kulturelle aspekter."
-- For specialized fields: "You are a Norwegian teacher specializing in business/medical/technical Norwegian. Focus on professional vocabulary and formal language patterns."
-- Add quick commands and descriptions. Example: "Handle these quick commands: *u [text] = translate [text] to your language, ..."
-- Experiment with "temperature" (0.0-1.0, higher = more creative responses)
-- Maximum response length "max_tokens" for token usage control
-
-📖 **Detailed Documentation:** See `ChatBot.md` for complete guide on configuring quick prompts, translation buttons, and clipboard copy functionality.
-
-> **WARNING!** In this version, the Chatbot doesn't remember conversation context to save tokens. It only works in question ⇒ answer mode.
 
 ## Support
 
 - Check debug.log for issues
 - Enable debug_mode in config.json for detailed logging
 
-> **IMPORTANT!** RESTART ANKI AFTER ANY CONFIGURATION CHANGES!!!
+
+### IMPORTANT! RESTART ANKI AFTER ANY CONFIGURATION CHANGES!!!
