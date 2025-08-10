@@ -19,9 +19,9 @@
 
 1. Скопіюйте всю папку inferanki до: `%APPDATA%\Anki2\addons21\`
 2. Відкрийте  `config.json` та додайте ваші API ключі:
-   - Скопіюйте API ключ від OpenAI в поле `openai_api_key`
-   - Скопіюйте API ключ від ElevenLabs в поле `elevenlabs_api_key`
-   - Скопіюйте id голосу в поле `elevenlabs_voice_id`
+   - Вставьте API ключ від OpenAI в поле `openai_api_key`
+   - Вставьте API ключ від ElevenLabs в поле `elevenlabs_api_key`
+   - Вставьте id голосу в поле `elevenlabs_voice_id`
 3. Перезапустіть Anki
 4. Налаштуйте поля 1 і 2 як показано на малюнках
 
