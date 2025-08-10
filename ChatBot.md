@@ -8,7 +8,7 @@ The InferAnki ChatBot is an AI-powered Norwegian language assistant integrated d
 
 ### Basic ChatBot Settings
 
-Edit `CardCraft/ai_prompts.json` → `chatbot` section:
+Edit `prompts.json` → `chatbot` section:
 
 ```json
 "chatbot": {
@@ -23,7 +23,7 @@ Edit `CardCraft/ai_prompts.json` → `chatbot` section:
 
 ### Quick Prompt System
 
-The ChatBot features a dynamic quick prompt system that automatically generates buttons based on configuration in `ai_prompts.json`. Each quick prompt:
+The ChatBot features a dynamic quick prompt system that automatically generates buttons based on configuration in `prompts.json`. Each quick prompt:
 
 1. Takes the current text from the input field as `{expression}`
 2. Uses your configured user language as `{user_lang}`
@@ -34,7 +34,7 @@ The ChatBot features a dynamic quick prompt system that automatically generates 
 
 To add a new quick prompt button:
 
-1. Open `CardCraft/ai_prompts.json`
+1. Open `prompts.json`
 2. Find `"chatbot" → "quick_prompts"`
 3. Add your new prompt:
 
@@ -84,7 +84,7 @@ Each quick prompt can override default API settings:
 ## Troubleshooting
 
 ### Button Not Appearing
-- Check JSON syntax in `ai_prompts.json`
+- Check JSON syntax in `prompts.json`
 - Restart Anki completely
 - Verify the prompt is inside `"quick_prompts"` object
 
@@ -107,4 +107,4 @@ Each quick prompt can override default API settings:
 
 ---
 
-> **Remember**: Always restart Anki after modifying `ai_prompts.json` configuration!
+> **Remember**: Always restart Anki after modifying `prompts.json` configuration!
