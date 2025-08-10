@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-CardCraft Word Analyzer
+CardCraft Word Family Analyzer
 Norwegian Bokmål word analysis using OpenAI GPT-4.1
 """
 
@@ -56,15 +56,15 @@ class NorwegianWordAnalyzer:
             print(f"Logging error: {e}")
     
     def _load_prompts(self) -> Dict[str, Any]:
-        """Load AI prompts from ai_prompts.json"""
+        """Load AI prompts from prompts.json"""
         try:
-            prompts_file = os.path.join(os.path.dirname(__file__), "ai_prompts.json")
+            prompts_file = os.path.join(os.path.dirname(__file__), "..", "prompts.json")
             
             if os.path.exists(prompts_file):
                 with open(prompts_file, 'r', encoding='utf-8') as f:
                     return json.load(f)
             else:
-                showCritical("ai_prompts.json not found")
+                showCritical("prompts.json not found")
                 return {}
                 
         except Exception as e:

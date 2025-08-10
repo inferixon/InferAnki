@@ -1,5 +1,5 @@
 # CardCraft - AI Integration Module for InferAnki
-# Version: 0.5.1
+
 
 """
 CardCraft: AI-powered card crafting for InferAnki

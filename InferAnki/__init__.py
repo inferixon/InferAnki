@@ -7,7 +7,7 @@ import re
 from datetime import datetime
 
 # Import addon modules
-from .CardCraft.tts_handler import ElevenLabsTTSProcessor 
+from .functions.tts_handler import ElevenLabsTTSProcessor 
 
 # Create alias for backward compatibility
 TTSProcessor = ElevenLabsTTSProcessor
@@ -59,7 +59,7 @@ CONFIG = load_config()
 
 # Try to import OpenAI client safely
 try:
-    from .CardCraft import OpenAIClient, NorwegianWordAnalyzer
+    from .functions import OpenAIClient, NorwegianWordAnalyzer
     OPENAI_AVAILABLE = True
     # Removed success message to reduce noise
 except ImportError as e:
@@ -1143,7 +1143,7 @@ def handle_chatgpt_command(editor):
             return
             
         # Import chatbot UI
-        from .CardCraft.chatbot_ui import show_chatbot_dialog
+        from .functions.chatbot_ui import show_chatbot_dialog
         
         # Show chatbot dialog
         show_chatbot_dialog(parent=editor.parentWidget if hasattr(editor, 'parentWidget') else None, config=CONFIG)

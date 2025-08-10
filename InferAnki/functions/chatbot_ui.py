@@ -108,11 +108,11 @@ class ChatBotDialog(QDialog):
         self.add_welcome_message()
     
     def load_prompts(self):
-        """Load AI prompts from ai_prompts.json"""
+        """Load AI prompts from prompts.json"""
         try:
             # Get the directory where this file is located
             current_dir = os.path.dirname(__file__)
-            prompts_path = os.path.join(current_dir, "ai_prompts.json")
+            prompts_path = os.path.join(current_dir, "..", "prompts.json")
             
             if os.path.exists(prompts_path):
                 with open(prompts_path, 'r', encoding='utf-8') as f:
