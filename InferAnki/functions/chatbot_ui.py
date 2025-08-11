@@ -57,6 +57,12 @@ class ChatWorker(QThread):
                 
             # Get system message and API settings
             system_message = chatbot_prompt.get("system_message", "")
+            
+            # Format system message with user language
+            user_lang = self.config.get("user_lang", "English")
+            if "{user_lang}" in system_message:
+                system_message = system_message.format(user_lang=user_lang)
+            
             api_settings = chatbot_prompt.get("api_settings", {})
             
             # Update client settings if provided

@@ -93,10 +93,10 @@
     ]
   },
   "norwegian_examples_from_content": {
-    "description": "Generate 3-5 short, natural Norwegian example sentences from existing content to demonstrate practical usage.",
-    "system_message": "Du er en ekspert på norsk språk og naturlig språkbruk. Du får innhold fra et norsk språkopplæringskort og skal lage 3-5 korte, naturlige eksempelsetninger som demonstrerer hvordan ordene/uttrykkene i innholdet brukes i praktiske sammenhenger. Velg setninger slik at samlingen totalt gir MAKSIMAL informasjonsverdi om ordets bruk: både de vanligste betydningene og viktige nyanser, idiomatisk bruk, ulike kontekster (faglig, dagligtale, etc). Varier med flertal og passiv form. Dersom 'user_context' er oppgitt, skal setningene gjenspeile dette tematisk og situasjonelt. Eksemplene skal være naturlige uten kunstig innsetting av kontekstord. Setningene skal være: korte og enkle å forstå, naturlige og hverdagslige, vise praktisk bruk av ord/uttrykk fra innholdet. Marker ord/uttrykk fra det oppgitte innholdet med fet skrift (**ord**). Tekst i italics (*tekst* eller <i>tekst</i>) er semantiske variabler - erstatt dem med passende norske ord som passer konteksten. Ikke bruk ordene direkte fra user_context som påtvungne detaljer - la konteksten influere situasjonen naturlig. IKKE bruk nummerering eller kulepunkter. Returner bare setningene, hver på egen linje, ingen overskrifter eller forklaringer.",
+    "description": "Generate 2-3 short, natural Norwegian example sentences from existing content to demonstrate practical usage.",
+    "system_message": "Du er en ekspert på norsk språk og naturlig språkbruk. Du får innhold fra et norsk språkopplæringskort og skal lage 2-3 (per hvert uttrykk) korte, naturlige eksempelsetninger som demonstrerer hvordan ordene/uttrykkene i innholdet brukes i praktiske sammenhenger. Velg setninger slik at samlingen totalt gir MAKSIMAL informasjonsverdi om ordets bruk: både de vanligste betydningene og viktige nyanser, idiomatisk bruk, ulike kontekster (faglig, dagligtale, etc). Varier med flertal og passiv form. Dersom 'user_context' er oppgitt, skal setningene gjenspeile dette tematisk og situasjonelt. Eksemplene skal være naturlige uten kunstig innsetting av kontekstord. Setningene skal være: korte og enkle å forstå, naturlige og hverdagslige, vise praktisk bruk av ord/uttrykk fra innholdet. Marker ord/uttrykk fra det oppgitte innholdet med fet skrift (**ord**). Tekst i italics (*tekst* eller <i>tekst</i>) er semantiske variabler - erstatt dem med passende norske ord som passer konteksten. Ikke bruk ordene direkte fra user_context som påtvungne detaljer - la konteksten influere situasjonen naturlig. IKKE bruk nummerering eller kulepunkter. Returner bare setningene, hver på egen linje, ingen overskrifter eller forklaringer.",
     "user_context": [],
-    "user_template": "Lag 3-5 korte eksempelsetninger basert på dette norske innholdet:\n\n{content}\n\nBruk brukerens kontekst for situasjonsveiledning (IKKE tving inn disse ordene): {user_context}\n\nSetningene skal vise naturlig bruk av hovedordene/uttrykkene fra innholdet. Bruk konteksten for å forme realistiske situasjoner, men ikke tving inn kontekstordene direkte. Skriv setningene uten nummerering, hver på egen linje.",
+    "user_template": "Lag 2-3 (per hvert uttrykk) korte eksempelsetninger basert på dette norske innholdet:\n\n{content}\n\nBruk brukerens kontekst for situasjonsveiledning (IKKE tving inn disse ordene): {user_context}\n\nSetningene skal vise naturlig bruk av hovedordene/uttrykkene fra innholdet. Bruk konteksten for å forme realistiske situasjoner, men ikke tving inn kontekstordene direkte. Skriv setningene uten nummerering, hver på egen linje.",
     "api_settings": {
       "model": "gpt-5-chat-latest",
       "temperature": 0.7,
@@ -112,7 +112,7 @@
   },
   "chatbot": {
     "description": "System prompt for ChatGPT assistant specialized in Norwegian language learning.",
-    "system_message": "You are an expert Norwegian language teacher and linguist, specializing in bokmål. You help students learn Norwegian grammar, vocabulary, pronunciation, and cultural context. Provide clear, accurate explanations with examples. When explaining grammar, use simple terms and practical examples. Try to provide explanations in the user's query language!",
+    "system_message": "You are an expert Norwegian language teacher and linguist, specializing in bokmål. You help students learn Norwegian grammar, vocabulary, pronunciation, and cultural context. Provide clear, accurate explanations with examples. When explaining grammar, use simple terms and practical examples. Try to provide explanations in the {user_lang} language!",
     "user_template": "{user_message}",
     "api_settings": {
       "model": "gpt-5-chat-latest",
@@ -123,14 +123,14 @@
       "prompt_meaning": {
         "description": "Explain the meaning of Norwegian expression with examples",
         "button_text": "BETYDNINGEN",
-        "prompt_template": "Forklar på {user_lang} betydningen av uttrykket '{expression}' med enkle ord og gi 2–3 korte eksempler på norsk.",
+        "prompt_template": "Forklar på {user_lang} betydningen av uttrykket '{expression}' med enkle ord og gi 2–3 korte eksempler på norsk. Legg til relevante engelske ekvivalenter av uttrykket.",
         "max_completion_tokens": 800,
         "copy_to_clipboard": false
       },
       "prompt_difference": {
         "description": "Explain difference between Norwegian expressions with examples",
         "button_text": "FORSKJELLEN",
-        "prompt_template": "Forklar på {user_lang} forskjellen mellom {expression} med 2–3 eksempler på norsk og kommentarer.",
+        "prompt_template": "Forklar på {user_lang} forskjellen mellom {expression} med 2–3 eksempler på norsk og kommentarer. Legg til relevante engelske ekvivalenter.",
         "max_completion_tokens": 1000,
         "copy_to_clipboard": false
       },
