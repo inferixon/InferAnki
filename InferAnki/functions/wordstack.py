@@ -289,16 +289,32 @@ class NorwegianWordAnalyzer:
             examples_list = []
             examples_data = translator_prompt.get("examples", {})
             if examples_data:
-                for example_input, expected_result in examples_data.items():
+                # Check if examples have the new structure with norwegian_input/english_output
+                if "norwegian_input" in examples_data and "english_output" in examples_data:
+                    norwegian_example = examples_data["norwegian_input"]
+                    english_example = examples_data["english_output"]
+                    
                     example_user = user_template.format(
-                        norwegian_json=json.dumps(example_input, ensure_ascii=False, indent=2),
+                        norwegian_json=json.dumps(norwegian_example, ensure_ascii=False, indent=2),
                         target_language=target_language
                     )
-                    example_assistant = json.dumps(expected_result, ensure_ascii=False)
+                    example_assistant = json.dumps(english_example, ensure_ascii=False)
                     examples_list.append({
                         "user": example_user,
                         "assistant": example_assistant
                     })
+                else:
+                    # Old format - iterate through examples
+                    for example_input, expected_result in examples_data.items():
+                        example_user = user_template.format(
+                            norwegian_json=json.dumps(example_input, ensure_ascii=False, indent=2),
+                            target_language=target_language
+                        )
+                        example_assistant = json.dumps(expected_result, ensure_ascii=False)
+                        examples_list.append({
+                            "user": example_user,
+                            "assistant": example_assistant
+                        })
             
             # Update OpenAI client settings
             api_settings = translator_prompt.get("api_settings", {})            
@@ -320,7 +336,33 @@ class NorwegianWordAnalyzer:
             
             if response:
                 try:
-                    english_result = json.loads(response)
+                    # Check if response is null or contains null
+                    response_stripped = response.strip()
+                    if response_stripped.lower() == 'null' or not response_stripped:
+                        showCritical("API returned null response for English translation")
+                        return None
+                    
+                    # Clean up common JSON formatting issues from GPT
+                    # Remove "json" prefix if present
+                    if response_stripped.lower().startswith('json'):
+                        response_stripped = response_stripped[4:].strip()
+                    
+                    # Remove markdown code blocks if present
+                    if response_stripped.startswith('```'):
+                        lines = response_stripped.split('\n')
+                        if len(lines) > 2:
+                            response_stripped = '\n'.join(lines[1:-1])
+                    
+                    # Fix trailing commas before closing braces/brackets
+                    import re
+                    response_stripped = re.sub(r',(\s*[}\]])', r'\1', response_stripped)
+                    
+                    english_result = json.loads(response_stripped)
+                    
+                    # Check if the parsed result is None/null
+                    if english_result is None:
+                        showCritical("English translation result is null")
+                        return None
                     
                     # Clean null patterns from English translation result
                     if english_result:
@@ -335,7 +377,7 @@ class NorwegianWordAnalyzer:
                     
                     return english_result
                 except json.JSONDecodeError as e:
-                    showCritical(f"Failed to parse English translation JSON: {e}")
+                    showCritical(f"Failed to parse English translation JSON: {e}\nResponse was: {response[:200]}...")
                     return None
             else:
                 showCritical("No response from translation API")
@@ -405,6 +447,21 @@ class NorwegianWordAnalyzer:
             }
             self._log_api_call(request_data, response, "STEP3_NORWEGIAN_DESCRIPTION")
             if response:
+                # Try to parse response as JSON first (in case GPT returned array)
+                try:
+                    import json
+                    parsed_response = json.loads(response.strip())
+                    if isinstance(parsed_response, list) and len(parsed_response) > 0:
+                        # If it's a list with one string, extract the string
+                        if len(parsed_response) == 1 and isinstance(parsed_response[0], str):
+                            response = parsed_response[0]
+                        else:
+                            # Multiple items in list, join them
+                            response = '\n'.join(str(item) for item in parsed_response)
+                except (json.JSONDecodeError, ValueError):
+                    # Not JSON, treat as regular text
+                    pass
+                
                 # Parse response as text and split by lines starting with 🔸
                 description_lines = []
                 for line in response.strip().split('\n'):
@@ -418,6 +475,10 @@ class NorwegianWordAnalyzer:
                 # If no 🔸 lines found, but we have response text, add it with 🔸
                 if not description_lines and response.strip():
                     response_text = self._clean_null_patterns(response.strip())
+                    if response_text and not response_text.startswith('🔸'):
+                        response_text = f"🔸 {response_text}"
+                    if response_text:
+                        description_lines.append(response_text)
                     if response_text and not response_text.startswith('🔸'):
                         response_text = f"🔸 {response_text}"
                     if response_text:

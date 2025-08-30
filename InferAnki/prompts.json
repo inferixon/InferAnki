@@ -35,8 +35,8 @@
   },
   "english_word_stack": {
     "description": "Translate Norwegian word forms JSON to {target_language} equivalents with same structure.",
-    "system_message": "You are an expert Norwegian-{target_language} translator. Translate each Norwegian word in the provided JSON to its most accurate {target_language} equivalent in same word family. Maintain the exact same JSON structure. Return ONLY valid JSON with no additional text.",
-    "user_template": "Translate this Norwegian word forms JSON to {target_language}:\n\n{norwegian_json}\n\nReturn the same JSON structure with {target_language} translations. Keep 'null' values as 'null'. Be precise and contextually accurate.",
+    "system_message": "You are an expert Norwegian-{target_language} translator. Translate each Norwegian word in the provided JSON to its most accurate {target_language} equivalent in same word family. Maintain the exact same JSON structure. Return ONLY valid JSON with no additional text. Never return null as the entire response - always return a proper JSON object.",
+    "user_template": "Translate this Norwegian word forms JSON to {target_language}:\n\n{norwegian_json}\n\nReturn the same JSON structure with {target_language} translations. Keep 'null' values as 'null'. Be precise and contextually accurate. Return valid JSON object, not null.",
     "api_settings": {
       "model": "gpt-5-chat-latest",
       "temperature": 0,
@@ -45,12 +45,31 @@
         "type": "json_object"
       }
     },
-    "examples": {}
+    "examples": {
+      "norwegian_input": {
+        "substantiv": [
+          "en antakelse"
+        ],
+        "adjektiv": "antagelig",
+        "adverb": "antageligvis",
+        "verb": "anta | antok | antatt",
+        "partisipp": null
+      },
+      "english_output": {
+        "substantiv": [
+          "an assumption"
+        ],
+        "adjektiv": "presumable",
+        "adverb": "presumably",
+        "verb": "assume | assumed | assumed",
+        "partisipp": null
+      }
+    }
   },
   "norwegian_description": {
     "description": "Generate a concise description of the core concept(s) represented by the Norwegian word stack, accounting for possible homonymy.",
-    "system_message": "Du er en ekspert på norsk språk og semantikk. Analyser det gitte ordstakket og gi en kort, presis beskrivelse av kjernekonseptet/konseptene som alle formene i stakket representerer. Fokuser på den underliggende betydningen eller prosessen som forener alle ordformene, ikke på hver enkelt form. Dersom ordstakket inneholder flere fullstendig ulike og uavhengige kjernekonsepter (ekte omonymi, ikke bare nærstående nyanser), skriv én linje per konsept, hver linje starter med 🔸. Ikke del opp nært beslektede nyanser — kun tydelige homonymer skal skilles. Svar med en liste der hver linje er et element (string) i listen, ingen ekstra tekst.",
-    "user_template": "Analyser dette norske ordstakket og beskriv kjernekonseptet/konseptene:\n\n{word_stack}\n\nGi en kort beskrivelse (hver linje starter med 🔸) som forklarer hovedbetydningen/prosessen for hver tydelig adskilt betydning (homonym) i stakket. Returner som en liste av strenger.",
+    "system_message": "Du er en ekspert på norsk språk og semantikk. Analyser det gitte ordstakket og gi en kort, presis beskrivelse av kjernekonseptet/konseptene som alle formene i stakket representerer. Fokuser på den underliggende betydningen eller prosessen som forener alle ordformene, ikke på hver enkelt form. Dersom ordstakket inneholder flere fullstendig ulike og uavhengige kjernekonsepter (ekte omonymi, ikke bare nærstående nyanser), skriv én linje per konsept, hver linje starter med 🔸. Ikke del opp nært beslektede nyanser — kun tydelige homonymer skal skilles. Returner direkte tekst, ikke JSON.",
+    "user_template": "Analyser dette norske ordstakket og beskriv kjernekonseptet/konseptene:\n\n{word_stack}\n\nGi en kort beskrivelse (hver linje starter med 🔸) som forklarer hovedbetydningen/prosessen for hver tydelig adskilt betydning (homonym) i stakket. Returner som ren tekst, ikke JSON eller array.",
     "api_settings": {
       "model": "gpt-5-chat-latest",
       "temperature": 0.1,
@@ -145,6 +164,13 @@
         "description": "Cultural context and usage situations",
         "button_text": "BERGENSK",
         "prompt_template": "Forklar bruken av '{expression}' i bergensdialekten. Svar på {user_lang}.",
+        "max_completion_tokens": 1000,
+        "copy_to_clipboard": false
+      },
+      "prompt_proofread": {
+        "description": "Grammar check and correction for Norwegian text",
+        "button_text": "PROOFREAD",
+        "prompt_template": "Sjekk grammatikk, rettskrivning og stil i denne norske teksten: '{expression}'\n\nReturner i formatet:\n\n**Korrigert tekst:**\n[rettet tekst her]\n\n**Kommentar:**\n[kort kommentar på {user_lang}]",
         "max_completion_tokens": 1000,
         "copy_to_clipboard": false
       },
