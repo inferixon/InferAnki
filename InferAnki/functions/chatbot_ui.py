@@ -29,11 +29,12 @@ class ChatWorker(QThread):
     response_ready = pyqtSignal(str, dict)  # response, metadata
     error_occurred = pyqtSignal(str)
     
-    def __init__(self, message, config, prompts, max_tokens=None):
+    def __init__(self, message, config, prompts, chat_history=None, max_tokens=None):
         super().__init__()
         self.message = message
         self.config = config
         self.prompts = prompts
+        self.chat_history = chat_history or []
         self.custom_max_tokens = max_tokens
         
     def run(self):
@@ -73,8 +74,27 @@ class ChatWorker(QThread):
                 max_tokens = self.custom_max_tokens if self.custom_max_tokens else api_settings.get("max_tokens", 2000)
                 openai_client.max_tokens = max_tokens
             
-            # Make API request with usage info
-            response, usage_info = openai_client.simple_request_with_usage(self.message, system_message)
+            # Build full message history for context
+            messages = [{"role": "system", "content": system_message}]
+            
+            # Add chat history for context (maintains conversation thread)
+            messages.extend(self.chat_history)
+            
+            # Add current message
+            messages.append({"role": "user", "content": self.message})
+            
+            # Make API request with full conversation history
+            data = openai_client._prepare_request_data(messages)
+            result = openai_client._make_request("chat/completions", data)
+            
+            if not result["success"]:
+                self.error_occurred.emit(f"API request failed: {result.get('error', 'Unknown error')}")
+                return
+            
+            # Extract response and usage
+            response_data = result["data"]
+            response = response_data["choices"][0]["message"]["content"]
+            usage_info = response_data.get("usage", {})
             
             # Calculate response time
             response_time = time.time() - start_time
@@ -354,13 +374,18 @@ class ChatBotDialog(QDialog):
         self.status_label.setText("Thinking...")
         self.status_label.setStyleSheet("color: orange; font-size: 16px;")
         
-        # Add to chat history (limit to max_history)
+        # Add to chat history BEFORE sending to API (limit to max_history)
         self.chat_history.append({"role": "user", "content": user_message})
-        if len(self.chat_history) > self.max_history:
+        if len(self.chat_history) > self.max_history * 2:  # *2 because we store both user and assistant
+            # Remove oldest pair (user + assistant messages)
             self.chat_history.pop(0)
+            if self.chat_history:  # Remove assistant response too
+                self.chat_history.pop(0)
         
-        # Start worker thread for API call
-        self.worker_thread = ChatWorker(user_message, self.config, self.prompts, max_tokens)
+        # Start worker thread for API call with current history (excluding current message)
+        # Pass history WITHOUT the current message (it will be added in worker)
+        history_without_current = self.chat_history[:-1]  # All messages except the one we just added
+        self.worker_thread = ChatWorker(user_message, self.config, self.prompts, history_without_current, max_tokens)
         self.worker_thread.response_ready.connect(self.on_response_ready)
         self.worker_thread.error_occurred.connect(self.on_error_occurred)
         self.worker_thread.finished.connect(self.on_worker_finished)

@@ -1,4 +1,4 @@
-# InferAnki v0.6.3
+# InferAnki v0.6.4
 
 **AI-powered Anki add-on to help you learn Norwegian**
 
@@ -135,7 +135,7 @@ This makes AI examples more relevant to your field when learning Norwegian vocab
 
 **Full documentation:** See `ChatBot-uk.md` for quick prompts, translation buttons, and clipboard copy setup.
 
-**NOTE:** In this version, the chatbot does not remember conversation context (to save tokens). It works in question ⇒ answer mode only.
+**Conversation memory**: The chatbot remembers the last 10 message pairs within each dialog session for coherent multi-turn conversations. Each new window starts fresh.
 
 ## Support
 

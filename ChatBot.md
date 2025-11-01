@@ -101,7 +101,9 @@ Each quick prompt can override default API settings:
 ## Performance Notes
 
 - Quick prompts clear the input field after execution
-- Each prompt uses separate API calls (no conversation memory)
+- **Conversation memory**: ChatBot remembers the last 10 message pairs (20 messages total) within each dialog session
+- Each new dialog window starts with a clean slate (no cross-session memory)
+- Context history is sent with each API request for coherent multi-turn conversations
 - Responses are optimized for brevity to save tokens
 - Set appropriate `max_completion_tokens` to control costs
 

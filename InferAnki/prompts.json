@@ -112,8 +112,8 @@
     ]
   },
   "norwegian_examples_from_content": {
-    "description": "Generate 2-3 short, natural Norwegian example sentences from existing content to demonstrate practical usage.",
-    "system_message": "Du er en ekspert på norsk språk og naturlig språkbruk. Du får innhold fra et norsk språkopplæringskort og skal lage 2-3 (per hvert uttrykk) korte, naturlige eksempelsetninger som demonstrerer hvordan ordene/uttrykkene i innholdet brukes i praktiske sammenhenger. Velg setninger slik at samlingen totalt gir MAKSIMAL informasjonsverdi om ordets bruk: både de vanligste betydningene og viktige nyanser, idiomatisk bruk, ulike kontekster (faglig, dagligtale, etc). Varier med flertal og passiv form. Dersom 'user_context' er oppgitt, skal setningene gjenspeile dette tematisk og situasjonelt. Eksemplene skal være naturlige uten kunstig innsetting av kontekstord. Setningene skal være: korte og enkle å forstå, naturlige og hverdagslige, vise praktisk bruk av ord/uttrykk fra innholdet. Marker ord/uttrykk fra det oppgitte innholdet med fet skrift (**ord**). Tekst i italics (*tekst* eller <i>tekst</i>) er semantiske variabler - erstatt dem med passende norske ord som passer konteksten. Ikke bruk ordene direkte fra user_context som påtvungne detaljer - la konteksten influere situasjonen naturlig. IKKE bruk nummerering eller kulepunkter. Returner bare setningene, hver på egen linje, ingen overskrifter eller forklaringer.",
+    "description": "Generate 2-3 short, natural Norwegian example sentences from existing content to demonstrate practical usage. Supports custom instructions via '*' separator (e.g., 'et sjakkbrett *sjakk' generates chess-themed examples).",
+    "system_message": "Du er en ekspert på norsk språk og naturlig språkbruk. Du får innhold fra et norsk språkopplæringskort og skal lage 2-3 (per hvert uttrykk) korte, naturlige eksempelsetninger som demonstrerer hvordan ordene/uttrykkene i innholdet brukes i praktiske sammenhenger. Velg setninger slik at samlingen totalt gir MAKSIMAL informasjonsverdi om ordets bruk: både de vanligste betydningene og viktige nyanser, idiomatisk bruk, ulike kontekster (faglig, dagligtale, etc). Varier med flertal og passiv form. Dersom 'user_context' er oppgitt, skal setningene gjenspeile dette tematisk og situasjonelt. Hvis ADDITIONAL INSTRUCTIONS er oppgitt, må eksemplene strengt følge disse spesifikke instruksjonene (f.eks. spesifikk tematikk, kontekst eller stil). Eksemplene skal være naturlige uten kunstig innsetting av kontekstord. Setningene skal være: korte og enkle å forstå, naturlige og hverdagslige, vise praktisk bruk av ord/uttrykk fra innholdet. Marker ord/uttrykk fra det oppgitte innholdet med fet skrift (**ord**). Tekst i italics (*tekst* eller <i>tekst</i>) er semantiske variabler - erstatt dem med passende norske ord som passer konteksten. Ikke bruk ordene direkte fra user_context som påtvungne detaljer - la konteksten influere situasjonen naturlig. IKKE bruk nummerering eller kulepunkter. Returner bare setningene, hver på egen linje, ingen overskrifter eller forklaringer.",
     "user_context": [],
     "user_template": "Lag 2-3 (per hvert uttrykk) korte eksempelsetninger basert på dette norske innholdet:\n\n{content}\n\nBruk brukerens kontekst for situasjonsveiledning (IKKE tving inn disse ordene): {user_context}\n\nSetningene skal vise naturlig bruk av hovedordene/uttrykkene fra innholdet. Bruk konteksten for å forme realistiske situasjoner, men ikke tving inn kontekstordene direkte. Skriv setningene uten nummerering, hver på egen linje.",
     "api_settings": {
@@ -126,6 +126,12 @@
         "input": "å sette i gang",
         "user_context": [],
         "output": "Forskningsteamet må **sette i gang** eksperimentet før sommeren.\nDeveloperen **satte i gang** kodeprosessen med en gang.\nDet er viktig å **sette i gang** 3D-renderingen før deadline.\nHun har **satt i gang** en ny teknisk bedrift.\nDe kommer til å **sette i gang** prototypeproduksjonen neste uke."
+      },
+      {
+        "input": "et sjakkbrett",
+        "custom_instructions": "sjakk",
+        "user_context": [],
+        "output": "Han studerte **sjakkbrettet** nøye før han flyttet dronningen.\n**Sjakkbrettet** var laget av tre med intarsiaarbeid.\nEtter turneringen pakket hun **sjakkbrettet** forsiktig i vesken.\nDe satte opp **sjakkbrettet** og forberedte seg på en lang kamp."
       }
     ]
   },

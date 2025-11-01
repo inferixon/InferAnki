@@ -130,16 +130,88 @@ def log_cardcraft_step(step_name, word, data):
 
 def init_addon():
     try:
+        # Editor buttons
         gui_hooks.editor_did_init_buttons.append(add_editor_buttons)
         gui_hooks.webview_did_receive_js_message.append(on_js_message)
+        
+        # Main window menu
+        add_main_menu()
+        
+        # Bottom toolbar button
+        gui_hooks.top_toolbar_did_init_links.append(add_bottom_toolbar_button)
             
     except Exception as e:
         showCritical(f"Error initializing {ADDON_NAME}: {str(e)}")
 
+def add_main_menu():
+    """Add InferAnki menu to main window Tools menu"""
+    try:
+        from aqt.qt import QAction, QKeySequence # type: ignore
+        
+        # Create ChatGPT action for menu
+        chatgpt_action = QAction("ChatGPT Assistant", mw)
+        chatgpt_action.triggered.connect(open_chatbot_from_main)
+        
+        # Add keyboard shortcut (Ctrl+G)
+        chatgpt_action.setShortcut(QKeySequence("Ctrl+G"))
+        
+        # Add to Tools menu
+        mw.form.menuTools.addAction(chatgpt_action)
+        
+    except Exception as e:
+        if CONFIG.get("debug_mode", False):
+            showCritical(f"Error adding main menu: {str(e)}")
+
+def add_bottom_toolbar_button(links, toolbar):
+    """Add ChatGPT button to bottom toolbar (deck overview screen)"""
+    try:
+        # Add HTML link to toolbar at the beginning (pycmd handler already registered via on_js_message)
+        links.insert(0,
+            '<a href="#" onclick="pycmd(\'inferanki:chatgpt\'); return false;" title="ChatGPT Assistant (Ctrl+G)" '
+            'style="color: white; padding: 5px 12px; text-decoration: none; display: inline-block; border-radius: 3px;" '
+            'onmouseover="this.style.outline=\'1px solid black\'" '
+            'onmouseout="this.style.outline=\'none\'"><b>ChatGPT</b></a>'
+        )
+    except Exception as e:
+        if CONFIG.get("debug_mode", False):
+            showInfo(f"Could not add bottom toolbar button: {e}")
+
+def open_chatbot_from_main():
+    """Open ChatBot dialog from main window"""
+    try:
+        if not CONFIG.get("chatbot_enabled", True):
+            showInfo("ChatGPT is disabled in configuration")
+            return
+            
+        # Import chatbot UI
+        from .functions.chatbot_ui import show_chatbot_dialog
+        
+        # Show chatbot dialog from main window
+        dialog = show_chatbot_dialog(parent=mw, config=CONFIG)
+        
+        # Store dialog reference to prevent garbage collection
+        if not hasattr(open_chatbot_from_main, 'dialogs'):
+            open_chatbot_from_main.dialogs = []
+        open_chatbot_from_main.dialogs.append(dialog)
+        
+        # Connect close event to cleanup
+        def on_dialog_closed():
+            if dialog in open_chatbot_from_main.dialogs:
+                open_chatbot_from_main.dialogs.remove(dialog)
+        
+        dialog.finished.connect(on_dialog_closed)
+        
+    except Exception as e:
+        showCritical(f"ChatGPT Error: {str(e)}")
+
 def on_js_message(handled, message, context):
-    """Handle JavaScript messages from editor"""
+    """Handle JavaScript messages from editor and toolbar"""
     if message.startswith("inferanki_"):
         handle_bridge_command(message, context)
+        return True, None
+    elif message == "inferanki:chatgpt":
+        # Handle toolbar ChatGPT button click
+        open_chatbot_from_main()
         return True, None
     return handled
 
@@ -888,7 +960,12 @@ def disable_tts_button_delayed(editor):
             showInfo(f"Delayed TTS button disable error: {e}")
 
 def handle_examples_command(editor):
-    """Handle the examples generation command."""
+    """Handle the examples generation command.
+    
+    Supports custom instructions via '*' separator:
+    - Normal: "et sjakkbrett" → generates examples with default context
+    - Custom: "et sjakkbrett *sjakk" → generates chess-themed examples only
+    """
     try:
         # Get the current note and field content
         note = editor.note
@@ -902,12 +979,17 @@ def handle_examples_command(editor):
             showInfo("Norsk field is empty.")
             return
         
+        # Parse content for custom instructions (format: "content *instructions")
+        content_parts = norsk_content.split('*', 1)
+        main_content = content_parts[0].strip()
+        custom_instructions = content_parts[1].strip() if len(content_parts) > 1 else None
+        
         # Disable the examples button while processing
         disable_examples_button(editor)
         
         try:
-            # Generate examples directly from Norsk field content
-            examples = generate_examples_from_content(norsk_content)
+            # Generate examples with optional custom instructions
+            examples = generate_examples_from_content(main_content, custom_instructions)
             if not examples:
                 showInfo("Could not generate examples.")
                 return
@@ -942,8 +1024,13 @@ def handle_examples_command(editor):
         showInfo(f"Error in examples command: {str(e)}")
 
 
-def generate_examples_from_content(content):
-    """Generate example sentences from existing Norsk field content."""
+def generate_examples_from_content(content, custom_instructions=None):
+    """Generate example sentences from existing Norsk field content.
+    
+    Args:
+        content: Main Norwegian text content from the field
+        custom_instructions: Optional custom instructions after "*" symbol
+    """
     try:
         # Check if WORD_ANALYZER is available
         if not WORD_ANALYZER:
@@ -964,7 +1051,15 @@ def generate_examples_from_content(content):
         
         # Build user message from template
         user_template = examples_prompt.get("user_template", "")
-        user_message = user_template.format(content=content, user_context=user_context)
+        
+        # Add custom instructions to the prompt if provided
+        if custom_instructions:
+            user_message = user_template.format(
+                content=content, 
+                user_context=user_context
+            ) + f"\n\nADDITIONAL INSTRUCTIONS: {custom_instructions}"
+        else:
+            user_message = user_template.format(content=content, user_context=user_context)
         
         # Get system message
         system_message = examples_prompt.get("system_message", "")
@@ -1145,13 +1240,24 @@ def handle_chatgpt_command(editor):
         # Import chatbot UI
         from .functions.chatbot_ui import show_chatbot_dialog
         
-        # Show chatbot dialog
-        show_chatbot_dialog(parent=editor.parentWidget if hasattr(editor, 'parentWidget') else None, config=CONFIG)
+        # Show chatbot dialog and store reference to prevent garbage collection
+        dialog = show_chatbot_dialog(parent=editor.parentWidget if hasattr(editor, 'parentWidget') else None, config=CONFIG)
+        
+        # Store dialog reference globally to prevent garbage collection
+        if not hasattr(handle_chatgpt_command, 'dialogs'):
+            handle_chatgpt_command.dialogs = []
+        handle_chatgpt_command.dialogs.append(dialog)
+        
+        # Connect close event to cleanup and re-enable button
+        def on_dialog_closed():
+            if dialog in handle_chatgpt_command.dialogs:
+                handle_chatgpt_command.dialogs.remove(dialog)
+            enable_chatgpt_button(editor)
+        
+        dialog.finished.connect(on_dialog_closed)
         
     except Exception as e:
         showCritical(f"ChatGPT Error: {str(e)}")
-    finally:
-        # Re-enable button when dialog closes
         enable_chatgpt_button(editor)
 
 def disable_chatgpt_button(editor):
