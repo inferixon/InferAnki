@@ -32,25 +32,34 @@ class OpenAIClient:
         # Check availability
         self.enabled = self._check_availability()
     
-    def _prepare_request_data(self, messages, custom_model=None, custom_temperature=None, custom_max_tokens=None):
-        """Prepare request data with model-specific parameters"""
+    def _prepare_request_data(
+        self,
+        messages,
+        custom_model=None,
+        custom_temperature=None,
+        custom_max_tokens=None,
+        response_format=None
+    ):
+        """Prepare request payload with optional per-call overrides"""
         model = custom_model or self.model
         temperature = custom_temperature if custom_temperature is not None else self.temperature
-        max_tokens = custom_max_tokens or self.max_tokens
+        max_tokens = custom_max_tokens if custom_max_tokens is not None else self.max_tokens
         
         data = {
             "model": model,
             "messages": messages
         }
+        if response_format:
+            data["response_format"] = response_format
         
         # Handle different parameter formats for different model families
-        if "gpt-5" in model.lower():
+        normalized_model = model.lower()
+        if "gpt-5" in normalized_model:
             # GPT-5 uses max_completion_tokens and may have temperature restrictions
             data["max_completion_tokens"] = max_tokens
-            if model == "gpt-5-chat-latest":
-                # Only gpt-5-chat-latest supports custom temperature
-                data["temperature"] = temperature
-            # Other GPT-5 models use default temperature (1.0)
+            # Current GPT-5 chat endpoints only expose default temperature=1.0
+            if abs(temperature - 1.0) > 1e-6 and self.config.get("debug_mode", False):
+                print("InferAnki: GPT-5 chat models ignore custom temperature; falling back to default 1.0")
         else:
             # GPT-4 and older models use standard parameters
             data["max_tokens"] = max_tokens
@@ -127,7 +136,16 @@ class OpenAIClient:
                 return {"success": False, "error": f"Invalid response format: {e}"}
         else:
             return {"success": False, "error": result["error"]}
-    def simple_request(self, prompt, system_message="You are a helpful assistant.", examples=None):
+    def simple_request(
+        self,
+        prompt,
+        system_message="You are a helpful assistant.",
+        examples=None,
+        custom_model=None,
+        custom_temperature=None,
+        custom_max_tokens=None,
+        response_format=None
+    ):
         """Make a simple request to OpenAI with optional few-shot examples"""
         if not self.enabled:
             return None
@@ -146,7 +164,13 @@ class OpenAIClient:
         messages.append({"role": "user", "content": prompt})
         
         # Use _prepare_request_data to handle model-specific parameters
-        data = self._prepare_request_data(messages)
+        data = self._prepare_request_data(
+            messages,
+            custom_model=custom_model,
+            custom_temperature=custom_temperature,
+            custom_max_tokens=custom_max_tokens,
+            response_format=response_format
+        )
         
         result = self._make_request("chat/completions", data)
         
@@ -161,7 +185,16 @@ class OpenAIClient:
                 showCritical(f"OpenAI request failed: {result['error']}")
             return None
     
-    def simple_request_with_usage(self, prompt, system_message="You are a helpful assistant.", examples=None):
+    def simple_request_with_usage(
+        self,
+        prompt,
+        system_message="You are a helpful assistant.",
+        examples=None,
+        custom_model=None,
+        custom_temperature=None,
+        custom_max_tokens=None,
+        response_format=None
+    ):
         """Make a simple request to OpenAI with optional few-shot examples, return response and usage info"""
         if not self.enabled:
             return None, None
@@ -180,7 +213,13 @@ class OpenAIClient:
         messages.append({"role": "user", "content": prompt})
         
         # Use _prepare_request_data to handle model-specific parameters
-        data = self._prepare_request_data(messages)
+        data = self._prepare_request_data(
+            messages,
+            custom_model=custom_model,
+            custom_temperature=custom_temperature,
+            custom_max_tokens=custom_max_tokens,
+            response_format=response_format
+        )
         
         result = self._make_request("chat/completions", data)
         

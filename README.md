@@ -1,4 +1,4 @@
-# InferAnki v0.6.4
+# InferAnki v0.6.5
 
 **AI-powered Anki add-on to help you learn Norwegian**
 
@@ -35,10 +35,10 @@ The system adapts to your learning pace.
 
 InferAnki brings **AI power** to Anki. It adds four buttons to the card editor toolbar:
 
-- ✨ **CardCraft**: Generate a complete card from a single word. GPT-5 finds related words, definitions, usage examples, and adds a translation in your chosen language.
+- ✨ **CardCraft**: Generate a complete card from a single word. GPT-5.2 finds related words, definitions, usage examples, and adds a translation in your chosen language.
 - 📝 **Examples**: Create extra examples from the text in field 2.
 - 👩🏼 **TTS**: Generate high-quality AI Norwegian audio for your text.
-- ☀️ **ChatGPT Assistant**: Chat with GPT-5 for detailed help, with quick prompts and copy-to-clipboard (e.g., for translations).
+- ☀️ **ChatGPT Assistant**: Chat with GPT-5.2 for detailed help, with quick prompts and copy-to-clipboard (e.g., for translations).
 
 The add-on uses custom prompts to control AI quality. You can flexibly adjust these prompts to your needs.
 

@@ -1,11 +1,10 @@
 {
   "norwegian_word_stack": {
     "description": "Analysere et norsk bokmålsord og returnere dets samsvarende former i andre ordklasser, i strukturert JSON-format.",
-    "system_message": "Du er en ekspert på norsk bokmål grammatikk. INPUT kan være enten et enkeltord eller et allerede generert word stack i JSON-format. Hvis input er et enkeltord, finn og returner den komplette derivasjonsparaidgmaen (word family) - alle ordformer som er morfologisk og semantisk avledet av samme rot og som representerer ordet i andre relevante ordklasser. VIKTIG: Inkluder KUN ordformer som er både morfologisk og semantisk relaterte - ikke ta med ord som har samme rot men helt andre betydninger. Hvis input allerede er et word stack, gå direkte til neste steg. Etterpå bruk mest verifiserte kilder som NAOB og Bokmålsordboka til å filtrere ut de upassende formene. Etterpå, sjekk hver ordform mot Store norske leksikon (snl.no). Søk etter ordformen som eksakt ord (ikke del av et annet ord eller kun ligner på et annet ord). Hvis du ikke finner eksakt samsvarende artikkel eller treff der ordformen forekommer som selvstendig ord, skal den settes til 'null', selv om den finnes som del av et annet ord eller i andre treff. RETURNER KUN 'null' hvis formen er sjelden, foreldet, ikke-eksisterende, bare grammatisk mulig/konstruert, gjetting eller fantasiformer. Returner KUN gyldig JSON. INGEN tekst utenfor JSON.",
+    "system_message": "Du er en ekspert på norsk bokmål grammatikk. INPUT kan være enten et enkeltord eller et allerede generert word stack i JSON-format. Hvis input er et enkeltord, finn og returner den komplette derivasjonsparaidgmaen (word family) - alle ordformer som er morfologisk og semantisk avledet av samme rot og som representerer ordet i andre relevante ordklasser. VIKTIG: Inkluder KUN ordformer som er både morfologisk og semantisk relaterte - ikke ta med ord som har samme rot men helt andre betydninger. ALDRI legg til synonymer eller konseptuelle substantiv fra andre røtter (for eksempel skal ikke 'å foretrekke' gi 'en preferanse'). Hvis input allerede er et word stack, gå direkte til neste steg. Etterpå bruk mest verifiserte kilder som NAOB og Bokmålsordboka til å filtrere ut de upassende formene. Etterpå, sjekk hver ordform mot Store norske leksikon (snl.no). Søk etter ordformen som eksakt ord (ikke del av et annet ord eller kun ligner på et annet ord). Hvis du ikke finner eksakt samsvarende artikkel eller treff der ordformen forekommer som selvstendig ord, skal den settes til 'null', selv om den finnes som del av et annet ord eller i andre treff. Når en ordform i disse kildene er merket som \"sjelden\", \"litterær\", \"poetisk\", \"dialekt\", \"foreldet\" eller tilsvarende lave frekvensmarkører (for eksempel frekvensetiketter som beskriver den som uvanlig), skal du også sette verdien til 'null' selv om formen teknisk sett eksisterer. Prioriter kun former som NAOB/Bokmålsordboka beskriver som vanlig/normal i moderne bokmål. Hvis du er i tvil om bruksfrekvensen, sett verdien til 'null'. RETURNER KUN 'null' hvis formen er sjelden, foreldet, ikke-eksisterende, bare grammatisk mulig/konstruert, gjetting eller fantasiformer. Returner KUN gyldig JSON. INGEN tekst utenfor JSON.",
     "user_template": "INPUT: {input_word}\n\nAnalyser ordet og returner de relevante formene i andre ordklasser som gyldig JSON:\n{{\n  \"substantiv\": [\"et/en (bruk bare 'en' i stedet 'ei') + substantiv (ubestemt form entall)\", \"alle relaterte substantiver som array\"],\n  \"adjektiv\": \"adjektiv < komparativ eller 'null' hvis ikke i vanlig bruk < superlativ eller 'null' hvis ikke i vanlig bruk\",\n  \"adverb\": \"adverb eller 'null' hvis ikke i vanlig bruk\",\n  \"verb\": \"infinitiv uten å | preteritum | perfektum uten har eller 'null' hvis ikke i vanlig bruk\",\n  \"partisipp\": \"presens partisipp eller 'null' hvis ikke i vanlig bruk\"\n}}\n\nKun verifiserte former fra NAOB/dinordbok. Ingen ekstra tekst.",
     "api_settings": {
-      "model": "gpt-5-chat-latest",
-      "temperature": 0,
+      "model": "gpt-5.2-chat-latest",
       "max_completion_tokens": 2000,
       "response_format": {
         "type": "json_object"
@@ -38,8 +37,7 @@
     "system_message": "You are an expert Norwegian-{target_language} translator. Translate each Norwegian word in the provided JSON to its most accurate {target_language} equivalent in same word family. Maintain the exact same JSON structure. Return ONLY valid JSON with no additional text. Never return null as the entire response - always return a proper JSON object.",
     "user_template": "Translate this Norwegian word forms JSON to {target_language}:\n\n{norwegian_json}\n\nReturn the same JSON structure with {target_language} translations. Keep 'null' values as 'null'. Be precise and contextually accurate. Return valid JSON object, not null.",
     "api_settings": {
-      "model": "gpt-5-chat-latest",
-      "temperature": 0,
+      "model": "gpt-5.2-chat-latest",
       "max_completion_tokens": 2000,
       "response_format": {
         "type": "json_object"
@@ -71,8 +69,7 @@
     "system_message": "Du er en ekspert på norsk språk og semantikk. Analyser det gitte ordstakket og gi en kort, presis beskrivelse av kjernekonseptet/konseptene som alle formene i stakket representerer. Fokuser på den underliggende betydningen eller prosessen som forener alle ordformene, ikke på hver enkelt form. Dersom ordstakket inneholder flere fullstendig ulike og uavhengige kjernekonsepter (ekte omonymi, ikke bare nærstående nyanser), skriv én linje per konsept, hver linje starter med 🔸. Ikke del opp nært beslektede nyanser — kun tydelige homonymer skal skilles. Returner direkte tekst, ikke JSON.",
     "user_template": "Analyser dette norske ordstakket og beskriv kjernekonseptet/konseptene:\n\n{word_stack}\n\nGi en kort beskrivelse (hver linje starter med 🔸) som forklarer hovedbetydningen/prosessen for hver tydelig adskilt betydning (homonym) i stakket. Returner som ren tekst, ikke JSON eller array.",
     "api_settings": {
-      "model": "gpt-5-chat-latest",
-      "temperature": 0.1,
+      "model": "gpt-5.2-chat-latest",
       "max_completion_tokens": 1000
     },
     "examples": {}
@@ -82,8 +79,7 @@
     "system_message": "Du er en ekspert på norsk språk. For hver ordform i stakket, lag én linje med 2–5 vanlige, korte uttrykk eller kolokasjoner der ordformen fra stakket skal stå i fet skrift (med dobbel stjerne: ** ) i hvert eksempel (Markdown). Ikke gjenta ordformen flere ganger i linjen. Eksemplene skal være maksimalt laconiske, naturlige og hyppig brukte – aldri kunstige, sjeldne, passive eller boklige. For verb, bruk infinitiv med 'å'. Hvis formen er null, ikke generer noe. Ingen overskrifter, ingen forklaringer, bare rå tekst – én linje per ordform.",
     "user_template": "Lag eksempler for dette norske ordstakket. Kan inneholde preposisjoner eller kolokasjoner. En linje per ordform:\n\n{word_stack_json}\n\nFormat:\nuttrykk1 med substantiv, uttrykk2 med substantiv, uttrykk3 med substantiv\n adjektiv uttrykk1, uttrykk2, uttrykk3\nå verb med å uttrykk, uttrykk, uttrykk\nverb-s (passiv form hvis eksisterer og brukes i dagligspråk)\n\nPrøv å ikke gjenta hoved ordet som står i 'examples'. Alle verbene brukt i uttrykkene som infinitive skal alltid ha 'å' foran seg i eksemplene. Eksemplene skal ha naturlig bruk av preposisjon eller struktur etter hva som er vanlig for ordet. Ikke bruk overskrifter eller forklaringer, bare rå tekst.",
     "api_settings": {
-      "model": "gpt-5-chat-latest",
-      "temperature": 0.5,
+      "model": "gpt-5.2-chat-latest",
       "max_completion_tokens": 2000
     },
     "examples": [
@@ -99,8 +95,7 @@
     "user_context": [],
     "user_template": "Lag naturlige norske setninger for dette ordstakket:\n\n{word_stack_json}\n\nUser context: {user_context}\n\nFormat: 1-2 fullstendige setninger per ordform der ordformen står i fet skrift (**ord**). Setningene skal være enkle, naturlige og hverdagslige.",
     "api_settings": {
-      "model": "gpt-5-chat-latest",
-      "temperature": 0.7,
+      "model": "gpt-5.2-chat-latest",
       "max_completion_tokens": 2000
     },
     "examples": [
@@ -117,8 +112,7 @@
     "user_context": [],
     "user_template": "Lag 2-3 (per hvert uttrykk) korte eksempelsetninger basert på dette norske innholdet:\n\n{content}\n\nBruk brukerens kontekst for situasjonsveiledning (IKKE tving inn disse ordene): {user_context}\n\nSetningene skal vise naturlig bruk av hovedordene/uttrykkene fra innholdet. Bruk konteksten for å forme realistiske situasjoner, men ikke tving inn kontekstordene direkte. Skriv setningene uten nummerering, hver på egen linje.",
     "api_settings": {
-      "model": "gpt-5-chat-latest",
-      "temperature": 0.7,
+      "model": "gpt-5.2-chat-latest",
       "max_completion_tokens": 2000
     },
     "examples": [
@@ -140,8 +134,7 @@
     "system_message": "You are an expert Norwegian language teacher and linguist, specializing in bokmål. You help students learn Norwegian grammar, vocabulary, pronunciation, and cultural context. Provide clear, accurate explanations with examples. When explaining grammar, use simple terms and practical examples. Try to provide explanations in the {user_lang} language!",
     "user_template": "{user_message}",
     "api_settings": {
-      "model": "gpt-5-chat-latest",
-      "temperature": 0.7,
+      "model": "gpt-5.2-chat-latest",
       "max_completion_tokens": 800
     },
     "quick_prompts": {

@@ -14,8 +14,7 @@ Edit `prompts.json` → `chatbot` section:
 "chatbot": {
   "system_message": "You are an expert Norwegian language teacher...",
   "api_settings": {
-    "model": "gpt-5-chat-latest",
-    "temperature": 0.7,
+    "model": "gpt-5.2-chat-latest",
     "max_completion_tokens": 800
   }
 }
@@ -67,19 +66,19 @@ Each quick prompt can override default API settings:
   "button_text": "EXAMPLE",
   "prompt_template": "...",
   "max_completion_tokens": 1500,  // Override default token limit
-  "temperature": 0.3,              // Override default temperature
   "copy_to_clipboard": false       // Control `response to clipboard`
 }
 ```
+
+Temperature overrides only apply to models that expose the parameter (e.g., GPT-4.x). GPT-5.2 chat models ignore this value even if it is present.
 
 ## Tips for Creating Effective Quick Prompts
 
 1. **Be Specific**: Clear instructions produce better results
 2. **Use Context**: Include the purpose and expected format
 3. **Set Appropriate Tokens**: Short answers = 400-800, detailed = 1000-1500
-4. **Test Temperature**: 0.0-0.3 for factual, 0.5-0.8 for creative responses
-5. **Clipboard**: Set `"copy_to_clipboard": true` if you want the response copied after each prompt.
-6. **Include Examples**: Show the AI what format you want
+4. **Clipboard**: Set `"copy_to_clipboard": true` if you want the response copied after each prompt.
+5. **Include Examples**: Show the AI what format you want
 
 ## Troubleshooting
 
@@ -96,7 +95,6 @@ Each quick prompt can override default API settings:
 ### API Errors
 - Check OpenAI API key in `config.json`
 - Verify internet connection
-- Check token limits (max 4000 for GPT-4)
 
 ## Performance Notes
 

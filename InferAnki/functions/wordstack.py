@@ -30,11 +30,37 @@ class NorwegianWordAnalyzer:
         self.openai_client = OpenAIClient(config)
         self.prompts = self._load_prompts()
         
-        # Setup logging
-        self.log_dir = os.path.join(os.path.dirname(__file__), "..", "..", "..", "KODEKRAFT", "PROJECTS", "InferAnki", "logs")
+        # Setup logging relative to addon root for portability
+        addon_root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+        self.log_dir = os.path.join(addon_root, "logs")
         if not os.path.exists(self.log_dir):
             os.makedirs(self.log_dir, exist_ok=True)
     
+    def _build_api_override_kwargs(self, api_settings: Dict[str, Any]) -> Dict[str, Any]:
+        """Map prompt api_settings to OpenAIClient override kwargs"""
+        overrides: Dict[str, Any] = {}
+        if not api_settings:
+            return overrides
+
+        model = api_settings.get("model")
+        if model:
+            overrides["custom_model"] = model
+
+        if "temperature" in api_settings:
+            overrides["custom_temperature"] = api_settings.get("temperature")
+
+        max_tokens = api_settings.get("max_completion_tokens")
+        if max_tokens is None:
+            max_tokens = api_settings.get("max_tokens")
+        if max_tokens is not None:
+            overrides["custom_max_tokens"] = max_tokens
+
+        response_format = api_settings.get("response_format")
+        if response_format:
+            overrides["response_format"] = response_format
+
+        return overrides
+
     def _log_api_call(self, request_data, response_data, step_name=""):
         """Log API request and response to convert-datetime.log"""
         try:
@@ -113,13 +139,15 @@ class NorwegianWordAnalyzer:
         
         # Update OpenAI client settings
         api_settings = analyzer_prompt.get("api_settings", {})
-        if api_settings:
-            self.openai_client.model = api_settings.get("model", "gpt-4.1")
-            self.openai_client.temperature = api_settings.get("temperature", 0.1)
-            self.openai_client.max_tokens = api_settings.get("max_tokens", 1000)
+        override_kwargs = self._build_api_override_kwargs(api_settings)
         try:
             # Make API request with examples
-            response = self.openai_client.simple_request(user_message, system_message, examples_list)
+            response = self.openai_client.simple_request(
+                user_message,
+                system_message,
+                examples_list,
+                **override_kwargs
+            )
             
             # Log the API call
             request_data = {
@@ -317,14 +345,16 @@ class NorwegianWordAnalyzer:
                         })
             
             # Update OpenAI client settings
-            api_settings = translator_prompt.get("api_settings", {})            
-            if api_settings:
-                self.openai_client.model = api_settings.get("model", "gpt-4.1")
-                self.openai_client.temperature = api_settings.get("temperature", 0)
-                self.openai_client.max_tokens = api_settings.get("max_tokens", 300)
+            api_settings = translator_prompt.get("api_settings", {})
+            override_kwargs = self._build_api_override_kwargs(api_settings)
             
             # Make the API call using simple_request with examples
-            response = self.openai_client.simple_request(user_message, system_message, examples_list)
+            response = self.openai_client.simple_request(
+                user_message,
+                system_message,
+                examples_list,
+                **override_kwargs
+            )
             
             # Log the API call
             request_data = {
@@ -429,14 +459,16 @@ class NorwegianWordAnalyzer:
                     })
             
             # Update OpenAI client settings
-            api_settings = description_prompt.get("api_settings", {})            
-            if api_settings:
-                self.openai_client.model = api_settings.get("model", "gpt-4.1")
-                self.openai_client.temperature = api_settings.get("temperature", 0.1)
-                self.openai_client.max_tokens = api_settings.get("max_tokens", 100)
+            api_settings = description_prompt.get("api_settings", {})
+            override_kwargs = self._build_api_override_kwargs(api_settings)
             
             # Make the API call with examples
-            response = self.openai_client.simple_request(user_message, system_message, examples_list)
+            response = self.openai_client.simple_request(
+                user_message,
+                system_message,
+                examples_list,
+                **override_kwargs
+            )
             
             # Log the API call
             request_data = {
@@ -561,12 +593,15 @@ class NorwegianWordAnalyzer:
             
             # Update OpenAI client settings
             api_settings = examples_prompt.get("api_settings", {})
-            if api_settings:
-                self.openai_client.model = api_settings.get("model", "gpt-4.1")
-                self.openai_client.temperature = api_settings.get("temperature", 0.2)
-                self.openai_client.max_tokens = api_settings.get("max_tokens", 300)
-              # Make the API call with examples
-            response = self.openai_client.simple_request(user_message, system_message, examples_list)
+            override_kwargs = self._build_api_override_kwargs(api_settings)
+
+            # Make the API call with examples
+            response = self.openai_client.simple_request(
+                user_message,
+                system_message,
+                examples_list,
+                **override_kwargs
+            )
             if response:
                 # Apply hardcoded processing: make noen, ens, noe italic
                 processed_response = response.strip()
@@ -650,13 +685,15 @@ class NorwegianWordAnalyzer:
             
             # Update OpenAI client settings
             api_settings = sentences_prompt.get("api_settings", {})
-            if api_settings:
-                self.openai_client.model = api_settings.get("model", "gpt-4.1")
-                self.openai_client.temperature = api_settings.get("temperature", 0.3)
-                self.openai_client.max_tokens = api_settings.get("max_tokens", 400)
+            override_kwargs = self._build_api_override_kwargs(api_settings)
             
             # Make the API call with examples
-            response = self.openai_client.simple_request(user_message, system_message, examples_list)
+            response = self.openai_client.simple_request(
+                user_message,
+                system_message,
+                examples_list,
+                **override_kwargs
+            )
             
             # Log the API call
             request_data = {

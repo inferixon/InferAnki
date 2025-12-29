@@ -167,7 +167,8 @@ class ElevenLabsTTSProcessor:
           # LOG: Record processed text with version marker
         if self.config.get("debug_mode", False):
             try:
-                logs_dir = r"a:\KODEKRAFT\PROJECTS\InferAnki\logs"
+                addon_root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+                logs_dir = os.path.join(addon_root, "logs")
                 os.makedirs(logs_dir, exist_ok=True)
                 log_file = os.path.join(logs_dir, "convert.log")
                 timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")

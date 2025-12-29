@@ -17,7 +17,7 @@
   "elevenlabs_speech_rate": 0.8,
   "elevenlabs_enable_logging": false,
   "ai_enabled": true,
-  "openai_default_model": "gpt-5-chat-latest",
+  "openai_default_model": "gpt-5.2-chat-latest",
   "openai_api_key": "YOUR_OPENAI_API_KEY_HERE",
   "chatbot_enabled": true,
   "chatbot_max_history": 10
