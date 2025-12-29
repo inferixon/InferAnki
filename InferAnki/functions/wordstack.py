@@ -225,14 +225,28 @@ class NorwegianWordAnalyzer:
         
         # Handle the new 5-field format - clean output without labels
         forms = []
-          # Handle substantiv field (can be array or string)
+
+        def _flatten_substantiv_entries(entry):
+            """Yield plain strings from nested substantiv lists"""
+            if isinstance(entry, list):
+                for item in entry:
+                    yield from _flatten_substantiv_entries(item)
+            elif isinstance(entry, str):
+                yield entry
+            elif entry is None:
+                return
+            else:
+                # Fallback: convert unexpected types to string to avoid crashes
+                yield str(entry)
+
+        # Handle substantiv field (can be array or string)
         substantiv = analysis.get("substantiv")
         if substantiv and substantiv != "null":
             if isinstance(substantiv, list):
                 # Add multiple substantivs as separate lines, cleaning each one
                 valid_substantivs = []
-                for s in substantiv:
-                    if s and s != "null" and s.strip():
+                for s in _flatten_substantiv_entries(substantiv):
+                    if isinstance(s, str) and s and s != "null" and s.strip():
                         cleaned_s = self._clean_null_patterns(s)
                         if cleaned_s:  # Only add if something remains after cleaning
                             valid_substantivs.append(cleaned_s)
