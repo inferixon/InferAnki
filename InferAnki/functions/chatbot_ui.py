@@ -36,6 +36,11 @@ class ChatWorker(QThread):
         self.prompts = prompts
         self.chat_history = chat_history or []
         self.custom_max_tokens = max_tokens
+        self._cancelled = False
+
+    def cancel(self):
+        """Cancel worker output handling"""
+        self._cancelled = True
         
     def run(self):
         """Execute ChatGPT API call in background thread"""
@@ -43,6 +48,9 @@ class ChatWorker(QThread):
         start_time = time.time()
         
         try:
+            if self._cancelled:
+                return
+
             if not OPENAI_AVAILABLE or not OpenAIClient:
                 self.error_occurred.emit("OpenAI client not available")
                 return
@@ -65,14 +73,14 @@ class ChatWorker(QThread):
                 system_message = system_message.format(user_lang=user_lang)
             
             api_settings = chatbot_prompt.get("api_settings", {})
-            
-            # Update client settings if provided
-            if api_settings:
-                openai_client.model = api_settings.get("model", "gpt-4")
-                openai_client.temperature = api_settings.get("temperature", 0.7)
-                # Use custom max_tokens if provided, otherwise use from api_settings
-                max_tokens = self.custom_max_tokens if self.custom_max_tokens else api_settings.get("max_tokens", 2000)
-                openai_client.max_tokens = max_tokens
+
+            custom_model = api_settings.get("model")
+            max_tokens = self.custom_max_tokens if self.custom_max_tokens else api_settings.get("max_completion_tokens")
+            if max_tokens is None:
+                max_tokens = api_settings.get("max_tokens", 2000)
+
+            reasoning_effort = api_settings.get("reasoning_effort")
+            verbosity = api_settings.get("verbosity")
             
             # Build full message history for context
             messages = [{"role": "system", "content": system_message}]
@@ -83,34 +91,32 @@ class ChatWorker(QThread):
             # Add current message
             messages.append({"role": "user", "content": self.message})
             
-            # Make API request with full conversation history
-            data = openai_client._prepare_request_data(messages)
-            result = openai_client._make_request("chat/completions", data)
-            
-            if not result["success"]:
-                self.error_occurred.emit(f"API request failed: {result.get('error', 'Unknown error')}")
+            response, usage_info = openai_client.request_with_messages(
+                messages,
+                custom_model=custom_model,
+                custom_max_tokens=max_tokens,
+                custom_reasoning_effort=reasoning_effort,
+                custom_verbosity=verbosity
+            )
+            if self._cancelled:
                 return
-            
-            # Extract response and usage
-            response_data = result["data"]
-            response = response_data["choices"][0]["message"]["content"]
-            usage_info = response_data.get("usage", {})
+            if not response:
+                self.error_occurred.emit("No response from ChatGPT")
+                return
             
             # Calculate response time
             response_time = time.time() - start_time
             
-            if response:
-                # Prepare metadata
-                metadata = {
-                    "response_time": response_time,
-                    "usage": usage_info or {}
-                }
-                self.response_ready.emit(response, metadata)
-            else:
-                self.error_occurred.emit("No response from ChatGPT")
+            # Prepare metadata
+            metadata = {
+                "response_time": response_time,
+                "usage": usage_info or {}
+            }
+            self.response_ready.emit(response, metadata)
                 
         except Exception as e:
-            self.error_occurred.emit(f"ChatGPT error: {str(e)}")
+            if not self._cancelled:
+                self.error_occurred.emit(f"ChatGPT error: {str(e)}")
 
 
 class ChatBotDialog(QDialog):
@@ -123,6 +129,7 @@ class ChatBotDialog(QDialog):
         self.max_history = self.config.get("chatbot_max_history", 10)
         self.prompts = self.load_prompts()
         self.worker_thread = None
+        self.is_closing = False
         self.setWindowTitle("InferAnki ChatGPT Assistant")
         self.setMinimumSize(700, 600)
         self.resize(800, 700)
@@ -386,6 +393,7 @@ class ChatBotDialog(QDialog):
         # Pass history WITHOUT the current message (it will be added in worker)
         history_without_current = self.chat_history[:-1]  # All messages except the one we just added
         self.worker_thread = ChatWorker(user_message, self.config, self.prompts, history_without_current, max_tokens)
+        self.worker_thread.setParent(self)
         self.worker_thread.response_ready.connect(self.on_response_ready)
         self.worker_thread.error_occurred.connect(self.on_error_occurred)
         self.worker_thread.finished.connect(self.on_worker_finished)
@@ -393,13 +401,24 @@ class ChatBotDialog(QDialog):
         
     def on_response_ready(self, response, metadata):
         """Handle successful ChatGPT response"""
-        self.add_to_chat("☀️ ChatGPT", response)
+        if self.is_closing:
+            return
+        
+        # Extract [COPY] content if present, hide marker from display
+        import re
+        copy_match = re.search(r'\[COPY\](.*?)\[/COPY\]', response, re.DOTALL)
+        copy_text = copy_match.group(1).strip() if copy_match else None
+        display_response = re.sub(r'\[COPY\].*?\[/COPY\]', '', response, flags=re.DOTALL).strip()
+        
+        self.add_to_chat("☀️ ChatGPT", display_response)
         
         # Copy to clipboard if requested
         if hasattr(self, 'current_copy_to_clipboard') and self.current_copy_to_clipboard:
             try:
                 clipboard = QApplication.clipboard()
-                clipboard.setText(response.strip())
+                # Use extracted [COPY] content if available, otherwise full response
+                text_to_copy = copy_text if copy_text else display_response.strip()
+                clipboard.setText(text_to_copy)
                 # Visual feedback - briefly show copied status
                 self.status_label.setText("📋 Copied to clipboard!")
                 self.status_label.setStyleSheet("color: green; font-size: 16px;")
@@ -451,6 +470,8 @@ class ChatBotDialog(QDialog):
         
     def on_error_occurred(self, error_message):
         """Handle ChatGPT API errors"""
+        if self.is_closing:
+            return
         self.add_to_chat("☀️ ChatGPT", f"❌ {error_message}")
           # Update status
         self.status_label.setText("Error occurred. Please try again.")
@@ -458,6 +479,8 @@ class ChatBotDialog(QDialog):
         
     def on_worker_finished(self):
         """Re-enable controls when worker thread finishes"""
+        if self.is_closing:
+            return
         self.input_field.setEnabled(True)
         self.send_button.setEnabled(True)
         self.input_field.setFocus()
@@ -618,8 +641,15 @@ class ChatBotDialog(QDialog):
         """Handle dialog close"""
         # Stop worker thread if running
         if self.worker_thread and self.worker_thread.isRunning():
-            self.worker_thread.terminate()
-            self.worker_thread.wait()
+            self.is_closing = True
+            self.worker_thread.cancel()
+            try:
+                self.worker_thread.response_ready.disconnect()
+                self.worker_thread.error_occurred.disconnect()
+                self.worker_thread.finished.disconnect()
+            except Exception:
+                pass
+            self.worker_thread.finished.connect(self.worker_thread.deleteLater)
         event.accept()
 
 

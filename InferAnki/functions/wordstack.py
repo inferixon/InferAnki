@@ -59,6 +59,14 @@ class NorwegianWordAnalyzer:
         if response_format:
             overrides["response_format"] = response_format
 
+        reasoning_effort = api_settings.get("reasoning_effort")
+        if reasoning_effort:
+            overrides["custom_reasoning_effort"] = reasoning_effort
+
+        verbosity = api_settings.get("verbosity")
+        if verbosity:
+            overrides["custom_verbosity"] = verbosity
+
         return overrides
 
     def _log_api_call(self, request_data, response_data, step_name=""):

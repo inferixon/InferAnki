@@ -1069,45 +1069,30 @@ def generate_examples_from_content(content, custom_instructions=None):
         if api_settings:
             # Extract settings with fallbacks
             custom_model = api_settings.get("model", WORD_ANALYZER.openai_client.model)
-            custom_temperature = api_settings.get("temperature", WORD_ANALYZER.openai_client.temperature)
+            custom_temperature = api_settings.get("temperature")
             # Handle both old and new token parameter names
             custom_max_tokens = api_settings.get("max_completion_tokens") or api_settings.get("max_tokens", WORD_ANALYZER.openai_client.max_tokens)
-            
+            custom_reasoning_effort = api_settings.get("reasoning_effort")
+            custom_verbosity = api_settings.get("verbosity")
+            response_format = api_settings.get("response_format")
+
             # Build messages manually for custom parameters
             messages = [{"role": "system", "content": system_message}]
             messages.append({"role": "user", "content": user_message})
-            
-            # Use _prepare_request_data with custom parameters
-            data = WORD_ANALYZER.openai_client._prepare_request_data(
-                messages, 
+
+            response, _usage = WORD_ANALYZER.openai_client.request_with_messages(
+                messages,
                 custom_model=custom_model,
-                custom_temperature=custom_temperature, 
-                custom_max_tokens=custom_max_tokens
+                custom_temperature=custom_temperature,
+                custom_max_tokens=custom_max_tokens,
+                response_format=response_format,
+                custom_reasoning_effort=custom_reasoning_effort,
+                custom_verbosity=custom_verbosity
             )
-            
-            # Handle response_format if specified (for JSON responses)
-            response_format = api_settings.get("response_format")
-            if response_format:
-                data["response_format"] = response_format
-            
-            # Make request directly
-            result = WORD_ANALYZER.openai_client._make_request("chat/completions", data)
-            
-            if result["success"]:
-                try:
-                    response = result["data"]["choices"][0]["message"]["content"]
-                    if response:
-                        response = response.strip()
-                    else:
-                        raise Exception("Empty response content")
-                except (KeyError, IndexError) as e:
-                    raise Exception(f"Invalid response format: {e}")
-            else:
-                raise Exception(f"OpenAI request failed: {result['error']}")
         else:
             # Fallback to simple_request for backward compatibility
             response = WORD_ANALYZER.openai_client.simple_request(
-                user_message, 
+                user_message,
                 system_message
             )
         

@@ -167,11 +167,11 @@
         "copy_to_clipboard": false
       },
       "prompt_proofread": {
-        "description": "Grammar check and correction for Norwegian text",
+        "description": "Grammar check and correction for Norwegian text with visual diff",
         "button_text": "PROOFREAD",
-        "prompt_template": "Sjekk grammatikk, rettskrivning og stil i denne norske teksten: '{expression}'\n\nReturner i formatet:\n\n**Korrigert tekst:**\n[rettet tekst her]\n\n**Kommentar:**\n[kort kommentar på {user_lang}]",
-        "max_completion_tokens": 1000,
-        "copy_to_clipboard": false
+        "prompt_template": "Sjekk grammatikk, rettskrivning og stil i denne norske teksten: '{expression}'\n\nReturner i formatet:\n\n**Korrigert tekst (visuell):**\nVis teksten med endringer markert slik: <span style=\"color:#E57373;text-decoration:line-through\">feil ord</span> <span style=\"color:#81C784\">riktig ord</span>\n\n**Kommentar:**\n[kort kommentar på {user_lang}]\n\n[COPY]ren korrigert tekst uten markering[/COPY]",
+        "max_completion_tokens": 1200,
+        "copy_to_clipboard": true
       },
       "prompt_translate_no": {
         "description": "Translate text to Norwegian",

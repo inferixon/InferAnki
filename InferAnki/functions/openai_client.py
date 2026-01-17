@@ -19,7 +19,7 @@ except ImportError:
 
 
 class OpenAIClient:
-    """Simple HTTP-based OpenAI client for Chat Completions API"""
+    """Simple HTTP-based OpenAI client for Responses API"""
     
     def __init__(self, config):
         self.config = config
@@ -27,44 +27,67 @@ class OpenAIClient:
         self.model = config.get("openai_default_model", "gpt-4.1")  # Use default_model as fallback
         self.temperature = config.get("ai_temperature", 0.3)
         self.max_tokens = config.get("ai_max_tokens", 1500)
+        self.reasoning_effort = config.get("openai_reasoning_effort", "medium")
+        self.verbosity = config.get("openai_text_verbosity", "medium")
         self.base_url = "https://api.openai.com/v1"
         
         # Check availability
         self.enabled = self._check_availability()
     
+    def _normalize_reasoning_verbosity(self, model, reasoning_effort, verbosity):
+        """Normalize reasoning and verbosity values based on model capabilities"""
+        normalized_model = (model or "").lower()
+        if "chat-latest" in normalized_model:
+            return "medium", "medium"
+
+        final_reasoning = reasoning_effort or "medium"
+        final_verbosity = verbosity or "medium"
+        return final_reasoning, final_verbosity
+
     def _prepare_request_data(
         self,
         messages,
         custom_model=None,
         custom_temperature=None,
         custom_max_tokens=None,
-        response_format=None
+        response_format=None,
+        custom_reasoning_effort=None,
+        custom_verbosity=None
     ):
         """Prepare request payload with optional per-call overrides"""
         model = custom_model or self.model
         temperature = custom_temperature if custom_temperature is not None else self.temperature
         max_tokens = custom_max_tokens if custom_max_tokens is not None else self.max_tokens
-        
+        reasoning_effort = custom_reasoning_effort if custom_reasoning_effort is not None else self.reasoning_effort
+        verbosity = custom_verbosity if custom_verbosity is not None else self.verbosity
+
         data = {
             "model": model,
-            "messages": messages
+            "input": messages
         }
-        if response_format:
-            data["response_format"] = response_format
-        
-        # Handle different parameter formats for different model families
-        normalized_model = model.lower()
+
+        normalized_model = (model or "").lower()
+        text_block = None
         if "gpt-5" in normalized_model:
-            # GPT-5 uses max_completion_tokens and may have temperature restrictions
-            data["max_completion_tokens"] = max_tokens
-            # Current GPT-5 chat endpoints only expose default temperature=1.0
-            if abs(temperature - 1.0) > 1e-6 and self.config.get("debug_mode", False):
-                print("InferAnki: GPT-5 chat models ignore custom temperature; falling back to default 1.0")
+            reasoning_effort, verbosity = self._normalize_reasoning_verbosity(model, reasoning_effort, verbosity)
+            data["reasoning"] = {"effort": reasoning_effort}
+            text_block = {"verbosity": verbosity}
+            if max_tokens is not None:
+                data["max_output_tokens"] = max_tokens
         else:
-            # GPT-4 and older models use standard parameters
-            data["max_tokens"] = max_tokens
-            data["temperature"] = temperature
-        
+            if max_tokens is not None:
+                data["max_output_tokens"] = max_tokens
+            if custom_temperature is not None:
+                data["temperature"] = temperature
+
+        if response_format:
+            if text_block is None:
+                text_block = {}
+            text_block["format"] = response_format
+
+        if text_block is not None:
+            data["text"] = text_block
+
         return data
     
     def _check_availability(self):
@@ -108,6 +131,30 @@ class OpenAIClient:
         except Exception as e:
             return {"success": False, "error": str(e)}
     
+    def _extract_response_text(self, response_data):
+        """Extract text from Responses API output"""
+        texts = []
+
+        if isinstance(response_data, dict):
+            output_text = response_data.get("output_text")
+            if isinstance(output_text, str) and output_text.strip():
+                texts.append(output_text)
+
+            for item in response_data.get("output", []):
+                if item.get("type") == "message":
+                    for content in item.get("content", []):
+                        if content.get("type") in ("output_text", "text"):
+                            text = content.get("text")
+                            if text:
+                                texts.append(text)
+                elif item.get("type") in ("output_text", "text"):
+                    text = item.get("text")
+                    if text:
+                        texts.append(text)
+
+        combined = "\n".join(texts).strip()
+        return combined if combined else None
+
     def test_connection(self):
         """Test basic connection to OpenAI"""
         if not self.enabled:
@@ -121,21 +168,57 @@ class OpenAIClient:
         
         # Use _prepare_request_data with custom max_tokens for quick test
         data = self._prepare_request_data(messages, custom_max_tokens=10)
-        
-        result = self._make_request("chat/completions", data)
+
+        result = self._make_request("responses", data)
         
         if result["success"]:
             try:
-                message = result["data"]["choices"][0]["message"]["content"]
+                message = self._extract_response_text(result["data"])
                 return {
-                    "success": True, 
-                    "response": message.strip(), 
+                    "success": True,
+                    "response": message.strip() if message else None,
                     "model": self.model
                 }
             except (KeyError, IndexError) as e:
                 return {"success": False, "error": f"Invalid response format: {e}"}
         else:
             return {"success": False, "error": result["error"]}
+
+    def request_with_messages(
+        self,
+        messages,
+        custom_model=None,
+        custom_temperature=None,
+        custom_max_tokens=None,
+        response_format=None,
+        custom_reasoning_effort=None,
+        custom_verbosity=None
+    ):
+        """Make a request with explicit message list and return response text and usage"""
+        if not self.enabled:
+            return None, None
+
+        data = self._prepare_request_data(
+            messages,
+            custom_model=custom_model,
+            custom_temperature=custom_temperature,
+            custom_max_tokens=custom_max_tokens,
+            response_format=response_format,
+            custom_reasoning_effort=custom_reasoning_effort,
+            custom_verbosity=custom_verbosity
+        )
+
+        result = self._make_request("responses", data)
+
+        if result["success"]:
+            response_data = result["data"]
+            message = self._extract_response_text(response_data)
+            usage_info = response_data.get("usage", {})
+            return message.strip() if message else None, usage_info
+
+        if self.config.get("debug_mode", False):
+            showCritical(f"OpenAI request failed: {result['error']}")
+        return None, None
     def simple_request(
         self,
         prompt,
@@ -163,27 +246,15 @@ class OpenAIClient:
         # Add the actual user prompt
         messages.append({"role": "user", "content": prompt})
         
-        # Use _prepare_request_data to handle model-specific parameters
-        data = self._prepare_request_data(
+        message, _usage = self.request_with_messages(
             messages,
             custom_model=custom_model,
             custom_temperature=custom_temperature,
             custom_max_tokens=custom_max_tokens,
             response_format=response_format
         )
-        
-        result = self._make_request("chat/completions", data)
-        
-        if result["success"]:
-            try:
-                message = result["data"]["choices"][0]["message"]["content"]
-                return message.strip() if message else None
-            except (KeyError, IndexError):
-                return None
-        else:
-            if self.config.get("debug_mode", False):
-                showCritical(f"OpenAI request failed: {result['error']}")
-            return None
+
+        return message
     
     def simple_request_with_usage(
         self,
@@ -212,27 +283,12 @@ class OpenAIClient:
         # Add the actual user prompt
         messages.append({"role": "user", "content": prompt})
         
-        # Use _prepare_request_data to handle model-specific parameters
-        data = self._prepare_request_data(
+        message, usage_info = self.request_with_messages(
             messages,
             custom_model=custom_model,
             custom_temperature=custom_temperature,
             custom_max_tokens=custom_max_tokens,
             response_format=response_format
         )
-        
-        result = self._make_request("chat/completions", data)
-        
-        if result["success"]:
-            try:
-                response_data = result["data"]
-                message = response_data["choices"][0]["message"]["content"]
-                usage_info = response_data.get("usage", {})
-                
-                return message.strip() if message else None, usage_info
-            except (KeyError, IndexError):
-                return None, None
-        else:
-            if self.config.get("debug_mode", False):
-                showCritical(f"OpenAI request failed: {result['error']}")
-            return None, None
+
+        return message, usage_info
