@@ -593,6 +593,15 @@ def enable_tts_button(editor):
 def handle_cardcraft_analysis(editor):
     """Handle CardCraft AI word analysis"""
     try:
+        def _normalize_multiline_block(text: str) -> str:
+            """Normalize model output to avoid blank lines in Anki fields."""
+            if not text:
+                return ""
+            normalized = text.replace("\r\n", "\n").replace("\r", "\n")
+            lines = [line.strip() for line in normalized.split("\n")]
+            non_empty_lines = [line for line in lines if line]
+            return "\n".join(non_empty_lines).strip()
+
         # ✨ DISABLE CARDCRAFT BUTTON AT THE START ✨
         disable_cardcraft_button(editor)
         
@@ -627,10 +636,18 @@ def handle_cardcraft_analysis(editor):
         word = text
 
         # Analyze the word (can be a single word or full text)
-        result = WORD_ANALYZER.analyze_word(word)
+        raw_result = WORD_ANALYZER.analyze_word(word)
         
         # Log Step 1
-        log_cardcraft_step("STEP1_NORWEGIAN_ANALYSIS", word, {"input": word, "result": result})
+        log_cardcraft_step("STEP1_NORWEGIAN_ANALYSIS", word, {"input": word, "result": raw_result})
+
+        # Optional STEP1B: Expert review to filter rare/uncommon forms before continuing
+        result = raw_result
+        if raw_result and CONFIG.get("cardcraft_expert_review_enabled", True):
+            reviewed_result = WORD_ANALYZER.expert_review_word_stack(word, raw_result)
+            log_cardcraft_step("STEP1B_EXPERT_REVIEW", word, {"input": raw_result, "result": reviewed_result})
+            if reviewed_result:
+                result = reviewed_result
         
         if result:
             # Step 1: Format Norwegian analysis and insert into field 2 (Norsk)
@@ -667,6 +684,7 @@ def handle_cardcraft_analysis(editor):
                 log_cardcraft_step("STEP4_AI_EXAMPLES", word, {"input": result, "result": examples_text})
                 
                 if examples_text:
+                    examples_text = _normalize_multiline_block(examples_text)
                     # Convert Markdown bold (**text**) to HTML (<b>text</b>)
                     import re
                     examples_html = re.sub(r'\*\*(.*?)\*\*', r'<b>\1</b>', examples_text)
@@ -687,6 +705,7 @@ def handle_cardcraft_analysis(editor):
                 log_cardcraft_step("STEP5_NORWEGIAN_SENTENCES", word, {"input": result, "result": sentences_text})
                 
                 if sentences_text:
+                    sentences_text = _normalize_multiline_block(sentences_text)
                     # Convert Markdown bold (**text**) to HTML (<b>text</b>)
                     sentences_html = re.sub(r'\*\*(.*?)\*\*', r'<b>\1</b>', sentences_text)
                     
@@ -1032,6 +1051,19 @@ def generate_examples_from_content(content, custom_instructions=None):
         custom_instructions: Optional custom instructions after "*" symbol
     """
     try:
+        def _normalize_examples_response(text: str) -> str:
+            """Remove empty lines and normalize whitespace in model output.
+
+            The Examples button expects a compact list of example sentences.
+            Any empty lines in the model output become blank rows after HTML conversion.
+            """
+            if not text:
+                return ""
+            normalized = text.replace("\r\n", "\n").replace("\r", "\n")
+            lines = [line.strip() for line in normalized.split("\n")]
+            non_empty_lines = [line for line in lines if line]
+            return "\n".join(non_empty_lines).strip()
+
         # Check if WORD_ANALYZER is available
         if not WORD_ANALYZER:
             raise Exception("CardCraft AI not available")
@@ -1098,6 +1130,9 @@ def generate_examples_from_content(content, custom_instructions=None):
         
         if not response:
             raise Exception("No response from OpenAI")
+
+        # Ensure there are no blank lines between example sentences
+        response = _normalize_examples_response(response)
         
         # Convert Markdown bold (**text**) to HTML (<b>text</b>)
         import re

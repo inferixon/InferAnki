@@ -230,7 +230,22 @@ class ChatBotDialog(QDialog):
         
         # Clear input field after sending quick prompt
         self.input_field.clear()
-        
+
+        # For PROOFREAD, do not spam the chat with the full prompt template.
+        # Show only the user's text (or a short service prefix), but still send
+        # the full formatted prompt to the API.
+        if prompt_id == "prompt_proofread":
+            display_text = expression
+            history_text = expression
+            self.send_message_text(
+                formatted_prompt,
+                max_tokens,
+                copy_to_clipboard,
+                display_text=display_text,
+                history_text=history_text,
+            )
+            return
+
         # Send formatted prompt with custom max_tokens and clipboard flag
         self.send_message_text(formatted_prompt, max_tokens, copy_to_clipboard)
     
@@ -349,11 +364,30 @@ class ChatBotDialog(QDialog):
             self.send_message_text(user_message, copy_to_clipboard=False)
             self.input_field.clear()
     
-    def send_message_text(self, message_text, max_tokens=None, copy_to_clipboard=False):
-        """Send a specific message text"""
-        user_message = message_text.strip()
+    def send_message_text(
+        self,
+        message_text,
+        max_tokens=None,
+        copy_to_clipboard=False,
+        display_text=None,
+        history_text=None,
+    ):
+        """Send a specific message text.
+
+        Args:
+            message_text: The actual message sent to the API.
+            max_tokens: Optional per-request max tokens.
+            copy_to_clipboard: Copy assistant response to clipboard.
+            display_text: Optional text shown in the chat UI instead of message_text.
+            history_text: Optional text stored in chat history instead of message_text.
+        """
+        api_message = (message_text or "").strip()
+        ui_message = (display_text if display_text is not None else api_message)
+        ui_message = (ui_message or "").strip()
+        stored_message = (history_text if history_text is not None else api_message)
+        stored_message = (stored_message or "").strip()
         
-        if not user_message:
+        if not api_message:
             return
             
         # Store clipboard flag for later use in response handler
@@ -375,14 +409,14 @@ class ChatBotDialog(QDialog):
         self.send_button.setEnabled(False)
         
         # Add user message to chat
-        self.add_to_chat("You", user_message)
+        self.add_to_chat("You", ui_message if ui_message else api_message)
         
         # Update status
         self.status_label.setText("Thinking...")
         self.status_label.setStyleSheet("color: orange; font-size: 16px;")
         
         # Add to chat history BEFORE sending to API (limit to max_history)
-        self.chat_history.append({"role": "user", "content": user_message})
+        self.chat_history.append({"role": "user", "content": stored_message if stored_message else api_message})
         if len(self.chat_history) > self.max_history * 2:  # *2 because we store both user and assistant
             # Remove oldest pair (user + assistant messages)
             self.chat_history.pop(0)
@@ -392,7 +426,7 @@ class ChatBotDialog(QDialog):
         # Start worker thread for API call with current history (excluding current message)
         # Pass history WITHOUT the current message (it will be added in worker)
         history_without_current = self.chat_history[:-1]  # All messages except the one we just added
-        self.worker_thread = ChatWorker(user_message, self.config, self.prompts, history_without_current, max_tokens)
+        self.worker_thread = ChatWorker(api_message, self.config, self.prompts, history_without_current, max_tokens)
         self.worker_thread.setParent(self)
         self.worker_thread.response_ready.connect(self.on_response_ready)
         self.worker_thread.error_occurred.connect(self.on_error_occurred)
@@ -498,11 +532,27 @@ class ChatBotDialog(QDialog):
             chat_html = f'<div style="margin-bottom: 15px;"><b style="color: #6AB7FF;">👤 You:</b><br>{html_message}<br></div>'
         else:
             chat_html = f'<div style="margin-bottom: 15px;"><b style="color: #4CAF50;">{sender}:</b><br>{html_message}<br></div>'
-            
-        self.chat_display.append(chat_html)
-          # Scroll to bottom
-        scrollbar = self.chat_display.verticalScrollBar()
-        scrollbar.setValue(scrollbar.maximum())
+
+        # Insert HTML manually so we can control scroll behavior.
+        cursor = self.chat_display.textCursor()
+        cursor.movePosition(cursor.MoveOperation.End)
+        start_pos = cursor.position()
+        cursor.insertHtml(chat_html)
+        cursor.insertBlock()
+        self.chat_display.setTextCursor(cursor)
+
+        # Scroll behavior:
+        # - For user messages, keep the classic "scroll to bottom" UX.
+        # - For assistant messages, scroll to the START of the new response
+        #   (useful for very long answers).
+        if sender == "You":
+            scrollbar = self.chat_display.verticalScrollBar()
+            scrollbar.setValue(scrollbar.maximum())
+        else:
+            top_cursor = self.chat_display.textCursor()
+            top_cursor.setPosition(start_pos)
+            self.chat_display.setTextCursor(top_cursor)
+            self.chat_display.ensureCursorVisible()
         
     def convert_markdown_to_html(self, text):
         """Convert Markdown formatting to HTML for Anki"""

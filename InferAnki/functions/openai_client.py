@@ -5,6 +5,7 @@ import json
 import urllib.request
 import urllib.parse
 import ssl
+import threading
 
 try:
     from aqt.utils import showInfo, showCritical # type: ignore
@@ -30,6 +31,10 @@ class OpenAIClient:
         self.reasoning_effort = config.get("openai_reasoning_effort", "medium")
         self.verbosity = config.get("openai_text_verbosity", "medium")
         self.base_url = "https://api.openai.com/v1"
+
+        # Network timeout (seconds). Long responses (e.g., PROOFREAD diffs) can exceed 30s.
+        # Keep it configurable but safe-by-default.
+        self.timeout_seconds = self._get_timeout_seconds()
         
         # Check availability
         self.enabled = self._check_availability()
@@ -95,6 +100,16 @@ class OpenAIClient:
         if not self.api_key or self.api_key == "your-api-key-here":
             return False
         return True
+
+    def _get_timeout_seconds(self) -> int:
+        """Get HTTP timeout in seconds from config with sane bounds."""
+        raw = self.config.get("openai_timeout_seconds")
+        try:
+            timeout = int(raw) if raw is not None else 120
+        except Exception:
+            timeout = 120
+        # Clamp to avoid accidental extremes
+        return max(30, min(600, timeout))
     
     def _make_request(self, endpoint, data):
         """Make HTTP request to OpenAI API"""
@@ -116,7 +131,7 @@ class OpenAIClient:
             ssl_context = ssl.create_default_context()
             
             # Make request
-            with urllib.request.urlopen(req, context=ssl_context, timeout=30) as response:
+            with urllib.request.urlopen(req, context=ssl_context, timeout=self.timeout_seconds) as response:
                 response_data = json.loads(response.read().decode('utf-8'))
                 return {"success": True, "data": response_data}
                 
@@ -217,7 +232,12 @@ class OpenAIClient:
             return message.strip() if message else None, usage_info
 
         if self.config.get("debug_mode", False):
-            showCritical(f"OpenAI request failed: {result['error']}")
+            # Avoid showing a modal dialog from non-main threads (can freeze Anki UI).
+            msg = f"OpenAI request failed: {result['error']}"
+            if threading.current_thread() is threading.main_thread() and ANKI_AVAILABLE:
+                showCritical(msg)
+            else:
+                print(msg)
         return None, None
     def simple_request(
         self,

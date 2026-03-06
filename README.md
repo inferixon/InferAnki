@@ -77,7 +77,7 @@ The add-on uses custom prompts to control AI quality. You can flexibly adjust th
 ### Add-on Setup
 
 1. Make sure you have the latest Anki for Windows: https://apps.ankiweb.net/
-2. Copy the entire `inferanki` folder to: `%APPDATA%\Anki2\addons21\`
+2. Copy the entire `InferAnki` folder to: `%APPDATA%\Anki2\addons21\`
 3. Open `config.json` in any code editor.
 4. Add your API keys to `config.json`:
    - Add your OpenAI API key to `openai_api_key`
@@ -139,7 +139,17 @@ This makes AI examples more relevant to your field when learning Norwegian vocab
 
 ## Support
 
-- Check `debug.log` for issues
-- Enable `debug_mode` in `config.json` for detailed logging
+- CardCraft pipeline logs: check `InferAnki/logs/convert-*.log` inside the add-on folder
+- Enable `debug_mode` in `config.json` for more visible error dialogs
+
+### Optional: prevent request timeouts
+
+If you generate very long answers (e.g., PROOFREAD with visual diff), you can increase the HTTP timeout:
+
+```json
+{
+   "openai_timeout_seconds": 300
+}
+```
 
 ### IMPORTANT! RESTART ANKI AFTER ANY SETTINGS CHANGE!!!

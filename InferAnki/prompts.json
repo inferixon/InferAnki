@@ -1,7 +1,7 @@
 {
   "norwegian_word_stack": {
     "description": "Analysere et norsk bokmålsord og returnere dets samsvarende former i andre ordklasser, i strukturert JSON-format.",
-    "system_message": "Du er en ekspert på norsk bokmål grammatikk. INPUT kan være enten et enkeltord eller et allerede generert word stack i JSON-format. Hvis input er et enkeltord, finn og returner den komplette derivasjonsparaidgmaen (word family) - alle ordformer som er morfologisk og semantisk avledet av samme rot og som representerer ordet i andre relevante ordklasser. VIKTIG: Inkluder KUN ordformer som er både morfologisk og semantisk relaterte - ikke ta med ord som har samme rot men helt andre betydninger. ALDRI legg til synonymer eller konseptuelle substantiv fra andre røtter (for eksempel skal ikke 'å foretrekke' gi 'en preferanse'). Hvis input allerede er et word stack, gå direkte til neste steg. Etterpå bruk mest verifiserte kilder som NAOB og Bokmålsordboka til å filtrere ut de upassende formene. Etterpå, sjekk hver ordform mot Store norske leksikon (snl.no). Søk etter ordformen som eksakt ord (ikke del av et annet ord eller kun ligner på et annet ord). Hvis du ikke finner eksakt samsvarende artikkel eller treff der ordformen forekommer som selvstendig ord, skal den settes til 'null', selv om den finnes som del av et annet ord eller i andre treff. Når en ordform i disse kildene er merket som \"sjelden\", \"litterær\", \"poetisk\", \"dialekt\", \"foreldet\" eller tilsvarende lave frekvensmarkører (for eksempel frekvensetiketter som beskriver den som uvanlig), skal du også sette verdien til 'null' selv om formen teknisk sett eksisterer. Prioriter kun former som NAOB/Bokmålsordboka beskriver som vanlig/normal i moderne bokmål. Hvis du er i tvil om bruksfrekvensen, sett verdien til 'null'. RETURNER KUN 'null' hvis formen er sjelden, foreldet, ikke-eksisterende, bare grammatisk mulig/konstruert, gjetting eller fantasiformer. Returner KUN gyldig JSON. INGEN tekst utenfor JSON.",
+    "system_message": "Du er en ekspert på norsk bokmål grammatikk. INPUT kan være enten et enkeltord eller et allerede generert word stack i JSON-format. Hvis input er et enkeltord, finn og returner den komplette derivasjonsparaidgmaen (word family) - alle ordformer som er morfologisk og semantisk avledet av samme rot og som representerer ordet i andre relevante ordklasser. VIKTIG: Inkluder KUN ordformer som er både morfologisk og semantisk relaterte - ikke ta med ord som har samme rot men helt andre betydninger. ALDRI legg til synonymer eller konseptuelle substantiv fra andre røtter (for eksempel skal ikke 'å foretrekke' gi 'en preferanse'). Hvis input allerede er et word stack, gå direkte til neste steg. Etterpå bruk mest verifiserte kilder som NAOB og Bokmålsordboka til å filtrere ut de upassende formene. Etterpå, sjekk hver ordform mot Store norske leksikon (snl.no). Søk etter ordformen som eksakt ord (ikke del av et annet ord eller kun ligner på et annet ord). Hvis du ikke finner eksakt samsvarende artikkel eller treff der ordformen forekommer som selvstendig ord, skal den settes til 'null', selv om den finnes som del av et annet ord eller i andre treff. Når en ordform i disse kildene er merket som 'sjelden', 'litterær', 'poetisk', 'dialekt', 'foreldet' eller tilsvarende lave frekvensmarkører (for eksempel frekvensetiketter som beskriver den som uvanlig), skal du også sette verdien til 'null' selv om formen teknisk sett eksisterer. Prioriter kun former som NAOB/Bokmålsordboka beskriver som vanlig/normal i moderne bokmål. Hvis du er i tvil om bruksfrekvensen, sett verdien til 'null'. ADVERB-REGEL: Returner kun en adverbform som faktisk brukes som adverb i moderne bokmål. Hvis det finnes en standard avledet adverbform (ofte med '-vis', f.eks. 'sannsynligvis'), preferer den. Behold adverb lik adjektiv KUN når den identiske formen er vanlig som adverb (f.eks. 'snakke tydelig', 'svare oppriktig'), eller når bruken primært er faste konstruksjoner (f.eks. 'så ... som mulig'). Hvis ingen trygg adverbform finnes, sett adverb til null. RETURNER KUN gyldig JSON. INGEN tekst utenfor JSON.",
     "user_template": "INPUT: {input_word}\n\nAnalyser ordet og returner de relevante formene i andre ordklasser som gyldig JSON:\n{{\n  \"substantiv\": [\"et/en (bruk bare 'en' i stedet 'ei') + substantiv (ubestemt form entall)\", \"alle relaterte substantiver som array\"],\n  \"adjektiv\": \"adjektiv < komparativ eller 'null' hvis ikke i vanlig bruk < superlativ eller 'null' hvis ikke i vanlig bruk\",\n  \"adverb\": \"adverb eller 'null' hvis ikke i vanlig bruk\",\n  \"verb\": \"infinitiv uten å | preteritum | perfektum uten har eller 'null' hvis ikke i vanlig bruk\",\n  \"partisipp\": \"presens partisipp eller 'null' hvis ikke i vanlig bruk\"\n}}\n\nKun verifiserte former fra NAOB/dinordbok. Ingen ekstra tekst.",
     "api_settings": {
       "model": "gpt-5.2-chat-latest",
@@ -29,6 +29,62 @@
         "adverb": "antageligvis",
         "verb": "anta | antok | antatt",
         "partisipp": null
+      }
+    }
+  },
+  "norwegian_word_stack_expert_review": {
+    "description": "Ekspert-etterkontroll av norwegian_word_stack: fjern sjeldne/foreldede/dialektale former og behold kun de mest vanlige moderne bokmålsformene.",
+    "system_message": "Du er en streng ekspert på moderne norsk bokmål (lexikografi + bruk). Du får et allerede generert word stack (JSON) for et input-ord/uttrykk. Oppgaven din er å rydde opp: behold kun ordformer som er vanlige og naturlige i moderne bokmål. Sett ALLE sjeldne, poetiske, litterære, dialektale, foreldede, kunstige, konstruerte eller tvilsomme former til null. Hvis du er i tvil om bruksfrekvens, sett til null. PRIORITER KUN høyfrekvente standardformer. Begrens omfang: i 'substantiv' behold maks 1–2 mest relevante substantiver (dropp resten). For 'adjektiv' bruk formatet 'positiv < komparativ/null < superlativ/null' og sett komparativ/superlativ til null hvis de ikke er i vanlig bruk. For 'verb' bruk formatet 'infinitiv uten å | preteritum | perfektum' eller null. ADVERB-REGEL (VIKTIG): adverb-feltet må være korrekt og naturlig i moderne bokmål. Du har lov til å endre adverb-verdien (ikke bare null-e). Hvis det finnes en standard og svært vanlig adverbform (ofte '-vis', f.eks. 'sannsynligvis'), bruk den. Behold adverb lik adjektiv KUN når identisk form er vanlig som adverb (f.eks. 'snakke tydelig', 'svare oppriktig') eller når adverbbruken primært er faste konstruksjoner (f.eks. 'så ... som mulig', 'best mulig', 'så fort som mulig'). Ikke aksepter en adjektivform som adverb hvis den gir unaturlige setninger (f.eks. 'det skjer sannsynlig', 'vi kan mulig ...'). Hvis du er i tvil, sett adverb til null. Bevar nøyaktig samme JSON-struktur og nøkler: substantiv (array), adjektiv (string/null), adverb (string/null), verb (string/null), partisipp (string/null). Returner KUN gyldig JSON-objekt, ingen annen tekst.",
+    "user_template": "INPUT: {input_word}\n\nHer er et foreløpig word stack (JSON). Rydd opp etter reglene og returner et forbedret word stack JSON:\n\n{norwegian_json}",
+    "api_settings": {
+      "model": "gpt-5.2-chat-latest",
+      "max_completion_tokens": 1200,
+      "response_format": {
+        "type": "json_object"
+      }
+    },
+    "examples": {
+      "anta": {
+        "input": {
+          "substantiv": [
+            "en antakelse",
+            "en antagelse",
+            "en antagelighet"
+          ],
+          "adjektiv": "antagelig < antageligere < antageligst",
+          "adverb": "antageligvis",
+          "verb": "anta | antok | antatt",
+          "partisipp": null
+        },
+        "output": {
+          "substantiv": [
+            "en antakelse"
+          ],
+          "adjektiv": "antagelig < null < null",
+          "adverb": "antageligvis",
+          "verb": "anta | antok | antatt",
+          "partisipp": null
+        }
+      },
+      "sannsynlig": {
+        "input": {
+          "substantiv": [
+            "en sannsynlighet"
+          ],
+          "adjektiv": "sannsynlig < mer sannsynlig < mest sannsynlig",
+          "adverb": "sannsynlig",
+          "verb": null,
+          "partisipp": null
+        },
+        "output": {
+          "substantiv": [
+            "en sannsynlighet"
+          ],
+          "adjektiv": "sannsynlig < mer sannsynlig < mest sannsynlig",
+          "adverb": "sannsynligvis",
+          "verb": null,
+          "partisipp": null
+        }
       }
     }
   },
@@ -76,7 +132,7 @@
   },
   "norwegian_examples_simple": {
     "description": "Generate maximally concise and natural usage examples for each word form in the Norwegian word stack, with typical prepositions or collocations and bolded word forms.",
-    "system_message": "Du er en ekspert på norsk språk. For hver ordform i stakket, lag én linje med 2–5 vanlige, korte uttrykk eller kolokasjoner der ordformen fra stakket skal stå i fet skrift (med dobbel stjerne: ** ) i hvert eksempel (Markdown). Ikke gjenta ordformen flere ganger i linjen. Eksemplene skal være maksimalt laconiske, naturlige og hyppig brukte – aldri kunstige, sjeldne, passive eller boklige. For verb, bruk infinitiv med 'å'. Hvis formen er null, ikke generer noe. Ingen overskrifter, ingen forklaringer, bare rå tekst – én linje per ordform.",
+    "system_message": "Du er en ekspert på norsk språk. For hver ordform i stakket, lag én linje med 2–5 vanlige, korte uttrykk eller kolokasjoner der ordformen fra stakket skal stå i fet skrift (med dobbel stjerne: ** ) i hvert eksempel (Markdown). Ikke gjenta ordformen flere ganger i linjen. Eksemplene skal være maksimalt laconiske, naturlige og hyppig brukte – aldri kunstige, sjeldne, passive eller boklige. For verb, bruk infinitiv med 'å'. Hvis formen er null, ikke generer noe. ADVERB-REGEL: Når du lager eksempler for 'adverb', bruk KUN idiomatisk og naturlig adverbbruk. Hvis adverbformen er lik adjektivformen, skal du fortsatt lage en egen adverb-linje, men bruk bare konstruksjoner der den identiske formen faktisk fungerer adverbialt i moderne bokmål (f.eks. 'snakke tydelig', 'oppriktig talt', eller faste uttrykk som 'så ... som mulig', 'best mulig'). IKKE lag adverb-eksempler som gir unaturlige setninger som 'det skjer sannsynlig' eller 'vi kan mulig ...'. Ingen overskrifter, ingen forklaringer, bare rå tekst – én linje per ordform.",
     "user_template": "Lag eksempler for dette norske ordstakket. Kan inneholde preposisjoner eller kolokasjoner. En linje per ordform:\n\n{word_stack_json}\n\nFormat:\nuttrykk1 med substantiv, uttrykk2 med substantiv, uttrykk3 med substantiv\n adjektiv uttrykk1, uttrykk2, uttrykk3\nå verb med å uttrykk, uttrykk, uttrykk\nverb-s (passiv form hvis eksisterer og brukes i dagligspråk)\n\nPrøv å ikke gjenta hoved ordet som står i 'examples'. Alle verbene brukt i uttrykkene som infinitive skal alltid ha 'å' foran seg i eksemplene. Eksemplene skal ha naturlig bruk av preposisjon eller struktur etter hva som er vanlig for ordet. Ikke bruk overskrifter eller forklaringer, bare rå tekst.",
     "api_settings": {
       "model": "gpt-5.2-chat-latest",
@@ -91,7 +147,7 @@
   },
   "norwegian_examples_sentences": {
     "description": "Lag 3–5 fullstendige, naturlige norske setninger for hver ordform i stakket, brukt i realistiske kontekster. Setningene kan være dialog, utdrag fra fagtekst eller andre naturlige sammenhenger.",
-    "system_message": "Du er en ekspert på norsk språk og naturlig språkbruk. For hver ordform i det gitte ordstakket, lag 1-2 fullstendige, naturlige norske setninger som demonstrerer ordformen i en realistisk kontekst. Velg setninger slik at samlingen totalt gir MAKSIMAL informasjonsverdi om ordets bruk: både de vanligste betydningene og viktige nyanser, idiomatisk bruk, ulike kontekster (faglig, dagligtale, etc).Varier med flertal og passiv form. Dersom 'user_context' er oppgitt, skal setningene gjenspeile dette så langt det er naturlig mulig. Setningene skal være klare, relevante og naturlige, aldri kunstige eller konstruerte. Ikke bruk ordene fra user_context som påtvungne detaljer - la konteksten influere situasjonen naturlig. Ordformen fra stakket skal markeres med fet skrift (**ord**). Hvis formen er null, ikke generer noe. Returner bare setningene, ingen overskrifter eller forklaringer.",
+    "system_message": "Du er en ekspert på norsk språk og naturlig språkbruk. For hver ordform i det gitte ordstakket, lag 1-2 fullstendige, naturlige norske setninger som demonstrerer ordformen i en realistisk kontekst. Velg setninger slik at samlingen totalt gir MAKSIMAL informasjonsverdi om ordets bruk: både de vanligste betydningene og viktige nyanser, idiomatisk bruk, ulike kontekster (faglig, dagligtale, etc). Varier med flertal og passiv form. Dersom 'user_context' er oppgitt, skal setningene gjenspeile dette så langt det er naturlig mulig. Setningene skal være klare, relevante og naturlige, aldri kunstige eller konstruerte. Ikke bruk ordene fra user_context som påtvungne detaljer - la konteksten influere situasjonen naturlig. Ordformen fra stakket skal markeres med fet skrift (**ord**). Hvis formen er null, ikke generer noe. ADVERB-REGEL: For 'adverb' må setningene være idiomatiske. Hvis adverbformen er lik adjektivformen, bruk bare naturlige adverbiale konstruksjoner (f.eks. 'snakke tydelig', 'oppriktig talt', eller faste uttrykk som 'så ... som mulig', 'best mulig'). IKKE bruk slike former som setningsadverb hvis det gir unaturlig språk ('det skjer sannsynlig', 'vi kan mulig ...'). Returner bare setningene, ingen overskrifter eller forklaringer.",
     "user_context": [],
     "user_template": "Lag naturlige norske setninger for dette ordstakket:\n\n{word_stack_json}\n\nUser context: {user_context}\n\nFormat: 1-2 fullstendige setninger per ordform der ordformen står i fet skrift (**ord**). Setningene skal være enkle, naturlige og hverdagslige.",
     "api_settings": {
@@ -135,63 +191,63 @@
     "user_template": "{user_message}",
     "api_settings": {
       "model": "gpt-5.2-chat-latest",
-      "max_completion_tokens": 800
+      "max_completion_tokens": 3000
     },
     "quick_prompts": {
       "prompt_meaning": {
         "description": "Explain the meaning of Norwegian expression with examples",
         "button_text": "BETYDNINGEN",
         "prompt_template": "Forklar på {user_lang} betydningen av uttrykket '{expression}' med enkle ord og gi 2–3 korte eksempler på norsk. Legg til relevante engelske ekvivalenter av uttrykket.",
-        "max_completion_tokens": 800,
+        "max_completion_tokens": 3000,
         "copy_to_clipboard": false
       },
       "prompt_difference": {
         "description": "Explain difference between Norwegian expressions with examples",
         "button_text": "FORSKJELLEN",
         "prompt_template": "Forklar på {user_lang} forskjellen mellom {expression} med 2–3 eksempler på norsk og kommentarer. Legg til relevante engelske ekvivalenter.",
-        "max_completion_tokens": 1000,
+        "max_completion_tokens": 3000,
         "copy_to_clipboard": false
       },
       "prompt_synonyms_antonyms": {
         "description": "Provide synonyms and antonyms for Norwegian word with nuances and examples",
         "button_text": "SYNONYMER",
         "prompt_template": "Gi synonymer og antonymer for det norske ordet '{expression}' med betydningsnyanser og eksempler på norsk med oversettelse til {user_lang}.",
-        "max_completion_tokens": 1200,
+        "max_completion_tokens": 3000,
         "copy_to_clipboard": false
       },
       "prompt_culture": {
         "description": "Cultural context and usage situations",
         "button_text": "BERGENSK",
         "prompt_template": "Forklar bruken av '{expression}' i bergensdialekten. Svar på {user_lang}.",
-        "max_completion_tokens": 1000,
+        "max_completion_tokens": 3000,
         "copy_to_clipboard": false
       },
       "prompt_proofread": {
         "description": "Grammar check and correction for Norwegian text with visual diff",
         "button_text": "PROOFREAD",
         "prompt_template": "Sjekk grammatikk, rettskrivning og stil i denne norske teksten: '{expression}'\n\nReturner i formatet:\n\n**Korrigert tekst (visuell):**\nVis teksten med endringer markert slik: <span style=\"color:#E57373;text-decoration:line-through\">feil ord</span> <span style=\"color:#81C784\">riktig ord</span>\n\n**Kommentar:**\n[kort kommentar på {user_lang}]\n\n[COPY]ren korrigert tekst uten markering[/COPY]",
-        "max_completion_tokens": 1200,
+        "max_completion_tokens": 7000,
         "copy_to_clipboard": true
       },
       "prompt_translate_no": {
         "description": "Translate text to Norwegian",
         "button_text": "TEKST ⇒ NO",
         "prompt_template": "Translate this text to Norwegian: '{expression}'. Return ONLY the translation, no explanations or comments.",
-        "max_completion_tokens": 500,
+        "max_completion_tokens": 7000,
         "copy_to_clipboard": true
       },
       "prompt_translate_en": {
         "description": "Translate text to English",
         "button_text": "TEKST ⇒ EN",
         "prompt_template": "Translate this text to English: '{expression}'. Return ONLY the translation, no explanations or comments.",
-        "max_completion_tokens": 500,
+        "max_completion_tokens": 7000,
         "copy_to_clipboard": true
       },
       "prompt_translate_uk": {
         "description": "Translate text to Ukrainian",
         "button_text": "TEKST ⇒ UK",
         "prompt_template": "Translate this text to Ukrainian: '{expression}'. Return ONLY the translation, no explanations or comments.",
-        "max_completion_tokens": 500,
+        "max_completion_tokens": 7000,
         "copy_to_clipboard": true
       }
     }

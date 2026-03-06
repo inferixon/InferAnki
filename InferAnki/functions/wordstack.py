@@ -188,6 +188,91 @@ class NorwegianWordAnalyzer:
         except Exception as e:
                         showCritical(f"Error analyzing word '{word}': {e}")
         return None
+
+    def expert_review_word_stack(self, input_word: str, analysis: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+        """Refine STEP1 output to keep only common modern Bokmål forms.
+
+        This is a second-pass review to reduce rare/archaic/dialectal forms.
+        Returns the refined JSON on success, or the original analysis on failure.
+        """
+        try:
+            if not analysis:
+                return None
+            if not self.openai_client.enabled:
+                return analysis
+
+            review_prompt = self.prompts.get("norwegian_word_stack_expert_review", {})
+            if not review_prompt:
+                return analysis
+
+            user_template = review_prompt.get("user_template", "")
+            system_message = review_prompt.get("system_message", "")
+            api_settings = review_prompt.get("api_settings", {})
+
+            norwegian_json_str = json.dumps(analysis, ensure_ascii=False, indent=2)
+            user_message = user_template.format(input_word=input_word, norwegian_json=norwegian_json_str)
+
+            # Few-shot examples (optional)
+            examples_list = []
+            examples_data = review_prompt.get("examples", {})
+            if isinstance(examples_data, dict):
+                for example_word, example_obj in examples_data.items():
+                    if not isinstance(example_obj, dict):
+                        continue
+                    example_input = example_obj.get("input")
+                    example_output = example_obj.get("output")
+                    if not example_input or not example_output:
+                        continue
+                    example_user = user_template.format(
+                        input_word=example_word,
+                        norwegian_json=json.dumps(example_input, ensure_ascii=False, indent=2)
+                    )
+                    example_assistant = json.dumps(example_output, ensure_ascii=False)
+                    examples_list.append({"user": example_user, "assistant": example_assistant})
+
+            override_kwargs = self._build_api_override_kwargs(api_settings)
+
+            response = self.openai_client.simple_request(
+                user_message,
+                system_message,
+                examples_list,
+                **override_kwargs
+            )
+
+            request_data = {
+                "system_message": system_message,
+                "examples": examples_list,
+                "user_message": user_message,
+                "api_settings": api_settings
+            }
+            self._log_api_call(request_data, response, f"STEP1B_EXPERT_REVIEW_{input_word}")
+
+            if not response:
+                return analysis
+
+            try:
+                reviewed = json.loads(response)
+            except json.JSONDecodeError:
+                return analysis
+
+            if not isinstance(reviewed, dict):
+                return analysis
+
+            # Minimal structural validation
+            required_keys = {"substantiv", "adjektiv", "adverb", "verb", "partisipp"}
+            if not required_keys.issubset(set(reviewed.keys())):
+                return analysis
+
+            # Ensure substantiv is always a list (or null)
+            substantiv_val = reviewed.get("substantiv")
+            if substantiv_val is not None and not isinstance(substantiv_val, list):
+                reviewed["substantiv"] = [str(substantiv_val)]
+
+            return reviewed
+
+        except Exception as e:
+            showCritical(f"Expert review error: {str(e)}")
+            return analysis
     def _validate_analysis(self, analysis: Dict[str, Any]) -> bool:        
         """Validate the structure of word analysis"""
         # Check for new format fields including partisipp

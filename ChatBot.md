@@ -15,7 +15,7 @@ Edit `prompts.json` → `chatbot` section:
   "system_message": "You are an expert Norwegian language teacher...",
   "api_settings": {
     "model": "gpt-5.2-chat-latest",
-    "max_completion_tokens": 800
+    "max_completion_tokens": 3000
   }
 }
 ```
@@ -76,7 +76,7 @@ Temperature overrides only apply to models that expose the parameter (e.g., GPT-
 
 1. **Be Specific**: Clear instructions produce better results
 2. **Use Context**: Include the purpose and expected format
-3. **Set Appropriate Tokens**: Short answers = 400-800, detailed = 1000-1500
+3. **Set Appropriate Token-limits**: Short answers = 400-800, detailed = 1000-1500, long texts (e.g., Proofread), use 3000–7000.
 4. **Clipboard**: Set `"copy_to_clipboard": true` if you want the response copied after each prompt.
 5. **Include Examples**: Show the AI what format you want
 
