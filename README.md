@@ -1,4 +1,4 @@
-# InferAnki v0.6.6
+# InferAnki v0.6.7
 
 **AI-powered Anki add-on to help you learn Norwegian**
 
