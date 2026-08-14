@@ -2,6 +2,7 @@ import os
 import re
 import tempfile
 import json
+import threading
 from datetime import datetime
 from pathlib import Path
 
@@ -87,9 +88,6 @@ class ElevenLabsTTSProcessor:
             return ""
         input_text = text.strip()
         
-        # DEBUG: Add version marker to logs to confirm new code is running
-        debug_marker = " [v0.3.22-FIXED]"
-        
         # FIRST: Remove 🔸 bullet content (improved logic)
         # Pattern 1: 🔸 content with <br><br> ending
         input_text = re.sub(r'(?:<[^>]*>)?🔸.*?<br\s*/?>\s*<br\s*/?>', '', input_text, flags=re.IGNORECASE | re.DOTALL)
@@ -174,7 +172,7 @@ class ElevenLabsTTSProcessor:
                 timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
                 with open(log_file, "a", encoding="utf-8") as f:
                     f.write(f"[{timestamp}] ORIGINAL: {repr(text)}\n")
-                    f.write(f"[{timestamp}] PROCESSED{debug_marker}: {input_text}\n")
+                    f.write(f"[{timestamp}] PROCESSED: {input_text}\n")
             except:
                 pass
 
@@ -228,7 +226,7 @@ class ElevenLabsTTSProcessor:
                     error_msg += f" - {error_details.get('detail', 'Unknown error')}"
                 except:
                     pass
-                showCritical(error_msg)
+                self._report_critical(error_msg)
                 return None
             
             # Create temporary file
@@ -245,14 +243,30 @@ class ElevenLabsTTSProcessor:
             return temp_path
             
         except requests.exceptions.Timeout:
-            showCritical("ElevenLabs TTS request timed out (30 seconds). Try with shorter text.")
+            self._report_critical("ElevenLabs TTS request timed out (30 seconds). Try with shorter text.")
             return None
         except requests.exceptions.RequestException as e:
-            showCritical(f"Network error with ElevenLabs TTS: {str(e)}")
+            self._report_critical(f"Network error with ElevenLabs TTS: {str(e)}")
             return None
         except Exception as e:
-            showCritical(f"Error creating ElevenLabs TTS audio: {str(e)}")
+            self._report_critical(f"Error creating ElevenLabs TTS audio: {str(e)}")
             return None
+
+    def _report_critical(self, message):
+        """Avoid opening Qt dialogs from a background worker."""
+        if ANKI_AVAILABLE and threading.current_thread() is threading.main_thread():
+            showCritical(message)
+        else:
+            print(message)
+
+    @staticmethod
+    def cleanup_temp_file(audio_path):
+        """Remove a generated temporary file when it exists."""
+        if audio_path and os.path.exists(audio_path):
+            try:
+                os.remove(audio_path)
+            except OSError:
+                pass
     
     def get_field_content(self, editor):
         """Get raw HTML content from field index 1 (second field)"""
@@ -344,9 +358,6 @@ class ElevenLabsTTSProcessor:
                 showCritical(f"Text too long ({len(text)} chars). Max allowed: {self.max_chars}")
                 return False
             
-            # Clear existing audio (silent processing)
-            self.clear_audio_field(editor)
-            
             # Create audio file
             audio_path = self.create_audio_file(text)
             if not audio_path:
@@ -360,12 +371,6 @@ class ElevenLabsTTSProcessor:
                 if ANKI_AVAILABLE and hasattr(editor, 'loadNote'):
                     editor.loadNote()
                 
-                # Clean up temporary file
-                try:
-                    os.remove(audio_path)
-                except:
-                    pass
-                    
                 return True
             else:
                 showCritical("Failed to add audio to note")
@@ -374,6 +379,9 @@ class ElevenLabsTTSProcessor:
         except Exception as e:
             showCritical(f"ElevenLabs TTS processing error: {str(e)}")
             return False
+        finally:
+            if 'audio_path' in locals():
+                self.cleanup_temp_file(audio_path)
 
 # Maintain backward compatibility
 TTSHandler = ElevenLabsTTSProcessor

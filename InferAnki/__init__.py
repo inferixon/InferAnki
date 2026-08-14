@@ -8,6 +8,10 @@ from datetime import datetime
 
 # Import addon modules
 from .functions.tts_handler import ElevenLabsTTSProcessor 
+from .functions.cardcraft_service import build_cardcraft_payload
+from .functions.examples_service import build_examples_payload
+from .functions.logging_utils import prune_log_files
+from .functions.bootstrap import load_addon_version
 
 # Create alias for backward compatibility
 TTSProcessor = ElevenLabsTTSProcessor
@@ -17,19 +21,9 @@ ADDON_NAME = "InferAnki"
 
 def get_addon_version():
     """Get addon version from meta.json"""
-    try:
-        addon_dir = os.path.dirname(__file__)
-        meta_path = os.path.join(addon_dir, "meta.json")
-        
-        if os.path.exists(meta_path):
-            with open(meta_path, 'r', encoding='utf-8') as f:
-                meta = json.load(f)
-                return meta.get("dev_version", meta.get("human_version", "0.5.1"))
-    except Exception as e:
-        if CONFIG.get("debug_mode", False):
-            showCritical(f"Error loading version from meta.json: {str(e)}")
-    
-    return "0.5.1"  # Fallback version
+    addon_dir = os.path.dirname(__file__)
+    meta_path = os.path.join(addon_dir, "meta.json")
+    return load_addon_version(meta_path, "0.5.1", showCritical)
 
 ADDON_VERSION = get_addon_version()
 
@@ -124,9 +118,13 @@ def log_cardcraft_step(step_name, word, data):
             f.write("DATA:\n")
             f.write(json.dumps(data, indent=2, ensure_ascii=False))
             f.write(f"\n{'='*60}\n\n")
+        prune_log_files(
+            logs_dir,
+            "convert-*.log",
+            CONFIG.get("runtime_log_max_files", 180),
+        )
     except Exception as e:
-        # Also log to Anki console
-        showInfo(f"Logging error: {e}")
+        print(f"Logging error: {e}")
 
 def init_addon():
     try:
@@ -299,10 +297,6 @@ def handle_bridge_command(cmd, context=None):
             handle_examples_command(editor)
         elif cmd == "inferanki_chatgpt":
             handle_chatgpt_command(editor)
-        elif cmd == "inferanki_ai": 
-            # AI functionality disabled until v0.4.x
-            showInfo("AI functionality will be available in v0.4.x")
-            # handle_ai_command(editor)
     except Exception as e:
         showCritical(f"Error handling command {cmd}: {str(e)}")
 
@@ -332,24 +326,47 @@ def is_norsk_field_available(editor):
         return False
 
 def handle_tts_command(editor):
+    """Generate TTS off the UI thread and replace audio only after success."""
     try:
-        # ✨ DISABLE TTS BUTTON AT THE START ✨
         disable_tts_button(editor)
-        
-        # Check if Norsk field has content before processing
+
         if not is_norsk_field_available(editor):
             showInfo("⚠️ Norsk field is empty!")
             enable_tts_button(editor)
             return
-            
-        # Process TTS with real functionality - silent operation
-        result = TTS_PROCESSOR.process_text(editor)
-        # Success is indicated by audio appearing in the audio field
-            
+
+        note = editor.note
+        text = TTS_PROCESSOR.get_field_content(editor)
+
+        def generate_audio():
+            """Create the temporary audio file without touching Anki state."""
+            return TTS_PROCESSOR.create_audio_file(text)
+
+        def finish_audio(future):
+            """Commit generated audio on the Anki UI thread."""
+            audio_path = None
+            try:
+                audio_path = future.result()
+                if not audio_path:
+                    showCritical("Failed to create audio file")
+                    return
+                if not hasattr(editor, "note") or editor.note is not note:
+                    showCritical("TTS result was not applied because the active note changed.")
+                    return
+                if not TTS_PROCESSOR.add_audio_to_note(editor, audio_path):
+                    showCritical("Failed to add audio to note")
+                    return
+                editor.loadNoteKeepingFocus()
+                editor.saveNow(lambda: None)
+            except Exception as error:
+                showCritical(f"TTS Error: {str(error)}")
+            finally:
+                TTS_PROCESSOR.cleanup_temp_file(audio_path)
+                enable_tts_button(editor)
+
+        mw.taskman.run_in_background(generate_audio, finish_audio)
     except Exception as e:
         showCritical(f"TTS Error: {str(e)}")
-    finally:
-        # ✨ ALWAYS RE-ENABLE TTS BUTTON AT THE END ✨
         enable_tts_button(editor)
 
 def disable_cardcraft_button(editor):
@@ -591,18 +608,8 @@ def enable_tts_button(editor):
             showInfo(f"TTS button enable error: {e}")
 
 def handle_cardcraft_analysis(editor):
-    """Handle CardCraft AI word analysis"""
+    """Build CardCraft in background and commit both fields atomically."""
     try:
-        def _normalize_multiline_block(text: str) -> str:
-            """Normalize model output to avoid blank lines in Anki fields."""
-            if not text:
-                return ""
-            normalized = text.replace("\r\n", "\n").replace("\r", "\n")
-            lines = [line.strip() for line in normalized.split("\n")]
-            non_empty_lines = [line for line in lines if line]
-            return "\n".join(non_empty_lines).strip()
-
-        # ✨ DISABLE CARDCRAFT BUTTON AT THE START ✨
         disable_cardcraft_button(editor)
         
         if not WORD_ANALYZER:
@@ -632,99 +639,42 @@ def handle_cardcraft_analysis(editor):
             enable_cardcraft_button(editor)
             return
 
-        # Use the FULL text before 🔸 for analysis, not just the last word
         word = text
+        note = editor.note
+        original_fields = tuple(note.fields[:2])
 
-        # Analyze the word (can be a single word or full text)
-        raw_result = WORD_ANALYZER.analyze_word(word)
-        
-        # Log Step 1
-        log_cardcraft_step("STEP1_NORWEGIAN_ANALYSIS", word, {"input": word, "result": raw_result})
+        def build_payload():
+            """Run the complete CardCraft pipeline without touching the note."""
+            return build_cardcraft_payload(
+                WORD_ANALYZER,
+                CONFIG,
+                word,
+                format_analysis_result,
+                log_cardcraft_step,
+            )
 
-        # Optional STEP1B: Expert review to filter rare/uncommon forms before continuing
-        result = raw_result
-        if raw_result and CONFIG.get("cardcraft_expert_review_enabled", True):
-            reviewed_result = WORD_ANALYZER.expert_review_word_stack(word, raw_result)
-            log_cardcraft_step("STEP1B_EXPERT_REVIEW", word, {"input": raw_result, "result": reviewed_result})
-            if reviewed_result:
-                result = reviewed_result
-        
-        if result:
-            # Step 1: Format Norwegian analysis and insert into field 2 (Norsk)
-            formatted_norwegian = format_analysis_result(result)
-            insert_analysis_into_editor(editor, formatted_norwegian, "field_2")
-            
-            # Step 2: Translate to English and insert into field 1 (English)
-            english_result = WORD_ANALYZER.translate_to_language(result)
-            
-            # Log Step 2
-            log_cardcraft_step("STEP2_ENGLISH_TRANSLATION", word, {"input": result, "result": english_result})
-            
-            if english_result:
-                formatted_english = format_analysis_result(english_result)
-                insert_analysis_into_editor(editor, formatted_english, "field_1")
-                
-                # Step 3: Get Norwegian word description and add to Norsk field
-                description_list = WORD_ANALYZER.get_description(formatted_norwegian)
-                
-                # Log Step 3
-                log_cardcraft_step("STEP3_NORWEGIAN_DESCRIPTION", word, {"input": formatted_norwegian, "result": description_list})
-                
-                if description_list:
-                    # Add description lines to Norwegian field with proper HTML formatting
-                    description_text = "<br>".join(description_list)
-                    current_norsk = get_field_content(editor, "Norsk")
-                    enhanced_norsk = f"{current_norsk}<br><br>{description_text}"
-                    insert_analysis_into_editor(editor, enhanced_norsk, "Norsk")
-                
-                # Step 4: Get usage examples and add to Norsk field
-                examples_text = WORD_ANALYZER.get_examples_simple(result)
-                
-                # Log Step 4
-                log_cardcraft_step("STEP4_AI_EXAMPLES", word, {"input": result, "result": examples_text})
-                
-                if examples_text:
-                    examples_text = _normalize_multiline_block(examples_text)
-                    # Convert Markdown bold (**text**) to HTML (<b>text</b>)
-                    import re
-                    examples_html = re.sub(r'\*\*(.*?)\*\*', r'<b>\1</b>', examples_text)
-                    
-                    # Replace newlines with <br> tags
-                    examples_html = examples_html.replace("\n", "<br>")
-                    
-                    # Add examples to Norwegian field
-                    current_norsk = get_field_content(editor, "Norsk")
-                    enhanced_norsk = f"{current_norsk}<br><br>{examples_html}"
-                    insert_analysis_into_editor(editor, enhanced_norsk, "Norsk")
-                
-                # Step 5: Get example sentences with user context and add to Norsk field
-                # Get user_context from ai_prompts.json instead of hardcoding
-                sentences_text = WORD_ANALYZER.get_examples_sentences(result)
-                
-                # Log Step 5
-                log_cardcraft_step("STEP5_NORWEGIAN_SENTENCES", word, {"input": result, "result": sentences_text})
-                
-                if sentences_text:
-                    sentences_text = _normalize_multiline_block(sentences_text)
-                    # Convert Markdown bold (**text**) to HTML (<b>text</b>)
-                    sentences_html = re.sub(r'\*\*(.*?)\*\*', r'<b>\1</b>', sentences_text)
-                    
-                    # Replace newlines with <br> tags
-                    sentences_html = sentences_html.replace("\n", "<br>")
-                    
-                    # Add sentences to Norwegian field with separator
-                    current_norsk = get_field_content(editor, "Norsk")
-                    enhanced_norsk = f"{current_norsk}<br><br>{sentences_html}"
-                    insert_analysis_into_editor(editor, enhanced_norsk, "Norsk")
-            else:
-                showCritical(f"⚠️ Norwegian analysis complete, but English translation failed for '{word}'")
-        else:
-            showCritical(f"❌ Could not analyze the word '{word}'. Please try again.")
-            
+        def finish_payload(future):
+            """Commit both fields together on the Anki UI thread."""
+            try:
+                payload = future.result()
+                if not hasattr(editor, "note") or editor.note is not note:
+                    showCritical("CardCraft result was not applied because the active note changed.")
+                    return
+                if tuple(note.fields[:2]) != original_fields:
+                    showCritical("CardCraft result was not applied because the card changed during generation.")
+                    return
+                note.fields[0] = payload["field_1"]
+                note.fields[1] = payload["field_2"]
+                editor.loadNoteKeepingFocus()
+                editor.saveNow(lambda: None)
+            except Exception as error:
+                showCritical(f"CardCraft Analysis Error: {str(error)}")
+            finally:
+                enable_cardcraft_button(editor)
+
+        mw.taskman.run_in_background(build_payload, finish_payload)
     except Exception as e:
         showCritical(f"CardCraft Analysis Error: {str(e)}")
-    finally:
-        # ✨ ALWAYS RE-ENABLE CARDCRAFT BUTTON AT THE END ✨
         enable_cardcraft_button(editor)
 
 def get_selected_text_from_editor(editor):
@@ -1006,145 +956,51 @@ def handle_examples_command(editor):
         # Disable the examples button while processing
         disable_examples_button(editor)
         
-        try:
-            # Generate examples with optional custom instructions
-            examples = generate_examples_from_content(main_content, custom_instructions)
-            if not examples:
-                showInfo("Could not generate examples.")
-                return
-            
-            # Append examples to Norsk field
-            updated_content = norsk_content + "<br><br>" + examples
-            
-            # Find Norsk field index and update it
-            norsk_field_index = 1  # Use field index 1 (second field)
-            
-            # Update the field
-            if len(note.fields) > norsk_field_index:
-                note.fields[norsk_field_index] = updated_content
-                
-                # Check if note is new (id = 0) and save appropriately
-                if note.id == 0:
-                    # For new notes, use editor's save method
-                    editor.saveNow(lambda: None)
-                else:
-                    # For existing notes, use note.flush()
-                    note.flush()
-                
-                editor.loadNote()
-            
-        except Exception as e:
-            showInfo(f"Error generating examples: {str(e)}")
-        finally:
-            # Re-enable the examples button
-            enable_examples_button(editor)
+        original_norsk = note.fields[1]
+
+        def build_examples():
+            """Generate and verify examples without touching the note."""
+            return generate_examples_from_content(main_content, custom_instructions)
+
+        def finish_examples(future):
+            """Append examples only if the original note remains unchanged."""
+            try:
+                examples = future.result()
+                if not examples:
+                    showInfo("Could not generate examples.")
+                    return
+                if not hasattr(editor, "note") or editor.note is not note:
+                    showInfo("Examples were not applied because the active note changed.")
+                    return
+                if note.fields[1] != original_norsk:
+                    showInfo("Examples were not applied because the Norsk field changed.")
+                    return
+                note.fields[1] = norsk_content + "<br><br>" + examples
+                editor.loadNoteKeepingFocus()
+                editor.saveNow(lambda: None)
+            except Exception as error:
+                showInfo(f"Error generating examples: {str(error)}")
+            finally:
+                enable_examples_button(editor)
+
+        mw.taskman.run_in_background(build_examples, finish_examples)
             
     except Exception as e:
         showInfo(f"Error in examples command: {str(e)}")
+        enable_examples_button(editor)
 
 
 def generate_examples_from_content(content, custom_instructions=None):
-    """Generate example sentences from existing Norsk field content.
-    
-    Args:
-        content: Main Norwegian text content from the field
-        custom_instructions: Optional custom instructions after "*" symbol
-    """
+    """Generate and verify examples through the standalone service."""
     try:
-        def _normalize_examples_response(text: str) -> str:
-            """Remove empty lines and normalize whitespace in model output.
-
-            The Examples button expects a compact list of example sentences.
-            Any empty lines in the model output become blank rows after HTML conversion.
-            """
-            if not text:
-                return ""
-            normalized = text.replace("\r\n", "\n").replace("\r", "\n")
-            lines = [line.strip() for line in normalized.split("\n")]
-            non_empty_lines = [line for line in lines if line]
-            return "\n".join(non_empty_lines).strip()
-
-        # Check if WORD_ANALYZER is available
-        if not WORD_ANALYZER:
-            raise Exception("CardCraft AI not available")
-        
-        # Get API key from CONFIG
-        api_key = CONFIG.get("openai_api_key", "")
-        if not api_key or api_key == "YOUR_OPENAI_API_KEY_HERE":
-            raise Exception("OpenAI API key not configured")
-        
-        # Get prompt from ai_prompts.json
-        examples_prompt = WORD_ANALYZER.prompts.get("norwegian_examples_from_content", {})
-        if not examples_prompt:
-            raise Exception("Examples prompt not found in ai_prompts.json")
-        
-        # Get user_context from prompt
-        user_context = examples_prompt.get("user_context", [])
-        
-        # Build user message from template
-        user_template = examples_prompt.get("user_template", "")
-        
-        # Add custom instructions to the prompt if provided
-        if custom_instructions:
-            user_message = user_template.format(
-                content=content, 
-                user_context=user_context
-            ) + f"\n\nADDITIONAL INSTRUCTIONS: {custom_instructions}"
-        else:
-            user_message = user_template.format(content=content, user_context=user_context)
-        
-        # Get system message
-        system_message = examples_prompt.get("system_message", "")
-        
-        # Update OpenAI client settings from api_settings
-        api_settings = examples_prompt.get("api_settings", {})
-        if api_settings:
-            # Extract settings with fallbacks
-            custom_model = api_settings.get("model", WORD_ANALYZER.openai_client.model)
-            custom_temperature = api_settings.get("temperature")
-            # Handle both old and new token parameter names
-            custom_max_tokens = api_settings.get("max_completion_tokens") or api_settings.get("max_tokens", WORD_ANALYZER.openai_client.max_tokens)
-            custom_reasoning_effort = api_settings.get("reasoning_effort")
-            custom_verbosity = api_settings.get("verbosity")
-            response_format = api_settings.get("response_format")
-
-            # Build messages manually for custom parameters
-            messages = [{"role": "system", "content": system_message}]
-            messages.append({"role": "user", "content": user_message})
-
-            response, _usage = WORD_ANALYZER.openai_client.request_with_messages(
-                messages,
-                custom_model=custom_model,
-                custom_temperature=custom_temperature,
-                custom_max_tokens=custom_max_tokens,
-                response_format=response_format,
-                custom_reasoning_effort=custom_reasoning_effort,
-                custom_verbosity=custom_verbosity
-            )
-        else:
-            # Fallback to simple_request for backward compatibility
-            response = WORD_ANALYZER.openai_client.simple_request(
-                user_message,
-                system_message
-            )
-        
-        if not response:
-            raise Exception("No response from OpenAI")
-
-        # Ensure there are no blank lines between example sentences
-        response = _normalize_examples_response(response)
-        
-        # Convert Markdown bold (**text**) to HTML (<b>text</b>)
-        import re
-        examples_html = re.sub(r'\*\*(.*?)\*\*', r'<b>\1</b>', response)
-        
-        # Replace newlines with <br> tags
-        examples_html = examples_html.replace("\n", "<br>")
-        
-        return examples_html
-        
-    except Exception as e:
-        raise Exception(f"Failed to generate examples: {str(e)}")
+        return build_examples_payload(
+            WORD_ANALYZER,
+            CONFIG,
+            content,
+            custom_instructions,
+        )
+    except Exception as error:
+        raise Exception(f"Failed to generate examples: {str(error)}") from error
 
 def disable_examples_button(editor):
     """Disable Examples button during processing to prevent crashes"""

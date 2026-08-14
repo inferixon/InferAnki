@@ -7,6 +7,8 @@ from PyQt6.QtGui import QFont, QKeySequence # type: ignore
 import json
 import os
 
+from .chat_history import append_turn
+
 try:
     from aqt.utils import showInfo, showCritical # type: ignore
     ANKI_AVAILABLE = True
@@ -58,10 +60,10 @@ class ChatWorker(QThread):
             # Create OpenAI client
             openai_client = OpenAIClient(self.config)
             
-            # Get chatbot prompt from ai_prompts.json
+            # Get chatbot prompt from prompts.json
             chatbot_prompt = self.prompts.get("chatbot", {})
             if not chatbot_prompt:
-                self.error_occurred.emit("ChatBot prompt not found in ai_prompts.json")
+                self.error_occurred.emit("ChatBot prompt not found in prompts.json")
                 return
                 
             # Get system message and API settings
@@ -344,7 +346,7 @@ class ChatBotDialog(QDialog):
         self.add_to_chat("☀️ ChatGPT", welcome)
         
     def test_connection(self):
-        """Test ChatGPT connection"""
+        """Run a real ChatGPT connection check."""
         if not OPENAI_AVAILABLE or not OpenAIClient:
             self.add_to_chat("☀️ ChatGPT", "❌ OpenAI client not available")
             return False
@@ -354,6 +356,10 @@ class ChatBotDialog(QDialog):
             self.add_to_chat("☀️ ChatGPT", "❌ API key not configured")
             return False
             
+        result = OpenAIClient(self.config).test_connection()
+        if not result.get("success"):
+            self.add_to_chat("☀️ ChatGPT", f"❌ {result.get('error', 'Connection failed')}")
+            return False
         self.add_to_chat("☀️ ChatGPT", "✅ Connection test successful!")
         return True
         
@@ -415,18 +421,15 @@ class ChatBotDialog(QDialog):
         self.status_label.setText("Thinking...")
         self.status_label.setStyleSheet("color: orange; font-size: 16px;")
         
-        # Add to chat history BEFORE sending to API (limit to max_history)
-        self.chat_history.append({"role": "user", "content": stored_message if stored_message else api_message})
-        if len(self.chat_history) > self.max_history * 2:  # *2 because we store both user and assistant
-            # Remove oldest pair (user + assistant messages)
-            self.chat_history.pop(0)
-            if self.chat_history:  # Remove assistant response too
-                self.chat_history.pop(0)
-        
-        # Start worker thread for API call with current history (excluding current message)
-        # Pass history WITHOUT the current message (it will be added in worker)
-        history_without_current = self.chat_history[:-1]  # All messages except the one we just added
-        self.worker_thread = ChatWorker(api_message, self.config, self.prompts, history_without_current, max_tokens)
+        # Keep incomplete or failed requests out of conversation history.
+        self.pending_history_text = stored_message if stored_message else api_message
+        self.worker_thread = ChatWorker(
+            api_message,
+            self.config,
+            self.prompts,
+            list(self.chat_history),
+            max_tokens,
+        )
         self.worker_thread.setParent(self)
         self.worker_thread.response_ready.connect(self.on_response_ready)
         self.worker_thread.error_occurred.connect(self.on_error_occurred)
@@ -446,6 +449,7 @@ class ChatBotDialog(QDialog):
         
         self.add_to_chat("☀️ ChatGPT", display_response)
         
+        copied_to_clipboard = False
         # Copy to clipboard if requested
         if hasattr(self, 'current_copy_to_clipboard') and self.current_copy_to_clipboard:
             try:
@@ -453,6 +457,7 @@ class ChatBotDialog(QDialog):
                 # Use extracted [COPY] content if available, otherwise full response
                 text_to_copy = copy_text if copy_text else display_response.strip()
                 clipboard.setText(text_to_copy)
+                copied_to_clipboard = True
                 # Visual feedback - briefly show copied status
                 self.status_label.setText("📋 Copied to clipboard!")
                 self.status_label.setStyleSheet("color: green; font-size: 16px;")
@@ -467,16 +472,19 @@ class ChatBotDialog(QDialog):
             # Reset the flag
             self.current_copy_to_clipboard = False
         
-        # Add to chat history
-        self.chat_history.append({"role": "assistant", "content": response})
-        if len(self.chat_history) > self.max_history:
-            self.chat_history.pop(0)
+        # Add only a complete user/assistant pair and trim by pairs.
+        self.chat_history = append_turn(
+            self.chat_history,
+            getattr(self, "pending_history_text", ""),
+            response,
+            self.max_history,
+        )
             
         # Store usage info for potential status restoration
         self.last_usage = metadata
         
         # If no clipboard operation, show usage immediately
-        if not hasattr(self, 'current_copy_to_clipboard') or not self.current_copy_to_clipboard:
+        if not copied_to_clipboard:
             self.show_usage_status()
     
     def restore_status(self):

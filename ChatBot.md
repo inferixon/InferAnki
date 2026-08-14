@@ -14,11 +14,12 @@ Edit `prompts.json` → `chatbot` section:
 "chatbot": {
   "system_message": "You are an expert Norwegian language teacher...",
   "api_settings": {
-    "model": "gpt-5.2-chat-latest",
     "max_completion_tokens": 3000
   }
 }
 ```
+
+The shared model is configured once in `config.json` through `openai_default_model`. Individual prompts may override it only when a specialized model is required.
 
 ### Quick Prompt System
 
@@ -28,6 +29,8 @@ The ChatBot features a dynamic quick prompt system that automatically generates 
 2. Uses your configured user language as `{user_lang}`
 3. Formats a pre-defined prompt template
 4. Sends the formatted request to ChatGPT
+
+The bundled preset provides `BETYDNINGEN`, `FORSKJELLEN`, `SYNONYMER`, `BERGENSK`, `PROOFREAD`, and translation actions for Norwegian, English, and Ukrainian.
 
 ### Adding New Quick Prompts
 
@@ -65,12 +68,12 @@ Each quick prompt can override default API settings:
 "prompt_example": {
   "button_text": "EXAMPLE",
   "prompt_template": "...",
-  "max_completion_tokens": 1500,  // Override default token limit
-  "copy_to_clipboard": false       // Control `response to clipboard`
+  "max_completion_tokens": 1500,
+  "copy_to_clipboard": false
 }
 ```
 
-Temperature overrides only apply to models that expose the parameter (e.g., GPT-4.x). GPT-5.2 chat models ignore this value even if it is present.
+`max_completion_tokens`, `copy_to_clipboard`, and an exceptional `model` override are optional per-prompt settings. The shared model remains in `config.json`.
 
 ## Tips for Creating Effective Quick Prompts
 
@@ -102,7 +105,6 @@ Temperature overrides only apply to models that expose the parameter (e.g., GPT-
 - **Conversation memory**: ChatBot remembers the last 10 message pairs (20 messages total) within each dialog session
 - Each new dialog window starts with a clean slate (no cross-session memory)
 - Context history is sent with each API request for coherent multi-turn conversations
-- Responses are optimized for brevity to save tokens
 - Set appropriate `max_completion_tokens` to control costs
 
 ---

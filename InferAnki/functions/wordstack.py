@@ -1,18 +1,34 @@
 # -*- coding: utf-8 -*-
 """
 CardCraft Word Family Analyzer
-Norwegian Bokmål word analysis using OpenAI GPT-4.1
+Norwegian Bokmål word analysis using OpenAI
 """
 
 import json
 import os
 import re
+import threading
 from typing import Dict, Optional, Any
 from datetime import datetime
 
 try:
-    from aqt.utils import showInfo, showCritical # type: ignore
+    from aqt.utils import showInfo as _anki_show_info # type: ignore
+    from aqt.utils import showCritical as _anki_show_critical # type: ignore
     ANKI_AVAILABLE = True
+
+    def showInfo(text):
+        """Show UI information only from the Anki main thread."""
+        if threading.current_thread() is threading.main_thread():
+            _anki_show_info(text)
+        else:
+            print(f"INFO: {text}")
+
+    def showCritical(text):
+        """Show UI errors only from the Anki main thread."""
+        if threading.current_thread() is threading.main_thread():
+            _anki_show_critical(text)
+        else:
+            print(f"CRITICAL: {text}")
 except ImportError:
     ANKI_AVAILABLE = False
 
@@ -20,6 +36,19 @@ except ImportError:
     def showCritical(text): print(f"CRITICAL: {text}")
 
 from .openai_client import OpenAIClient
+from .corpus_client import CorpusEvidenceClient
+from .linguistic_qa import (
+    LinguisticQABlockedError,
+    build_collocation_evidence_entries,
+    build_evidence_entries,
+    build_inferanki_contract,
+    build_receipt,
+    build_target_language_contract,
+    build_translation_evidence_entries,
+    sha256_text,
+    write_receipt,
+)
+from .logging_utils import prune_log_files
 
 
 class NorwegianWordAnalyzer:
@@ -28,6 +57,7 @@ class NorwegianWordAnalyzer:
     def __init__(self, config: Dict[str, Any]):
         self.config = config
         self.openai_client = OpenAIClient(config)
+        self.corpus_client = CorpusEvidenceClient(config)
         self.prompts = self._load_prompts()
         
         # Setup logging relative to addon root for portability
@@ -86,6 +116,11 @@ class NorwegianWordAnalyzer:
                 f.write("API-RESPONSE:\n")
                 f.write(str(response_data))
                 f.write(f"\n{'='*60}\n\n")
+            prune_log_files(
+                self.log_dir,
+                "convert-*.log",
+                self.config.get("runtime_log_max_files", 180),
+            )
         except Exception as e:
             print(f"Logging error: {e}")
     
@@ -132,6 +167,11 @@ class NorwegianWordAnalyzer:
         
         # Get system message
         system_message = analyzer_prompt.get("system_message", "")
+        system_message += (
+            "\nVIKTIG KILDEGRENSE: Du har ikke direkte tilgang til NAOB, "
+            "Bokmålsordboka eller SNL i dette steget. Ikke påstå at du har søkt i dem. "
+            "Foreslå former fra språkkompetansen din; neste steg får faktisk korpusevidens."
+        )
         
         # Build few-shot examples from examples field
         examples_list = []
@@ -210,7 +250,13 @@ class NorwegianWordAnalyzer:
             api_settings = review_prompt.get("api_settings", {})
 
             norwegian_json_str = json.dumps(analysis, ensure_ascii=False, indent=2)
+            corpus_evidence = self.get_corpus_evidence(input_word, analysis)
+            collocation_evidence = self.get_collocation_evidence(input_word, analysis)
             user_message = user_template.format(input_word=input_word, norwegian_json=norwegian_json_str)
+            user_message += self.corpus_client.format_for_prompt(corpus_evidence)
+            user_message += self.corpus_client.format_collocations_for_prompt(
+                collocation_evidence
+            )
 
             # Few-shot examples (optional)
             examples_list = []
@@ -243,6 +289,8 @@ class NorwegianWordAnalyzer:
                 "system_message": system_message,
                 "examples": examples_list,
                 "user_message": user_message,
+                "corpus_evidence": corpus_evidence,
+                "collocation_evidence": collocation_evidence,
                 "api_settings": api_settings
             }
             self._log_api_call(request_data, response, f"STEP1B_EXPERT_REVIEW_{input_word}")
@@ -273,12 +321,446 @@ class NorwegianWordAnalyzer:
         except Exception as e:
             showCritical(f"Expert review error: {str(e)}")
             return analysis
+
+    def get_corpus_evidence(self, *values: Any) -> Dict[str, Any]:
+        """Return fail-open Norwegian corpus evidence for prompt grounding."""
+        return self.corpus_client.lookup(values)
+
+    def get_collocation_evidence(self, *values: Any) -> Dict[str, Any]:
+        """Return fail-open Norwegian concordance evidence for phrase review."""
+        return self.corpus_client.lookup_collocations(values)
+
+    @staticmethod
+    def _serialize_qa_value(value: Any) -> str:
+        """Serialize structured QA context without generator rationale."""
+        if isinstance(value, str):
+            return value
+        return json.dumps(value, ensure_ascii=False, indent=2)
+
+    def _run_clean_linguistic_review(
+        self,
+        contract: Dict[str, Any],
+        source_content: Any,
+        candidate: str,
+        evidence: list,
+        step_name: str,
+    ) -> Dict[str, Any]:
+        """Run a stateless reviewer request that cannot rewrite the candidate."""
+        prompt_key = (
+            "norwegian_linguistic_independent_review"
+            if contract.get("locale") == "nb-NO"
+            else "target_language_linguistic_independent_review"
+        )
+        prompt = self.prompts.get(prompt_key, {})
+        if not prompt:
+            raise LinguisticQABlockedError("Independent reviewer prompt is missing")
+        user_message = prompt.get("user_template", "").format(
+            contract=json.dumps(contract, ensure_ascii=False, indent=2),
+            source_content=self._serialize_qa_value(source_content),
+            candidate=candidate,
+            evidence=json.dumps(evidence, ensure_ascii=False, indent=2),
+            candidate_sha256=sha256_text(candidate),
+        )
+        system_message = prompt.get("system_message", "")
+        api_settings = prompt.get("api_settings", {})
+        response = self.openai_client.simple_request(
+            user_message,
+            system_message,
+            **self._build_api_override_kwargs(api_settings),
+        )
+        self._log_api_call(
+            {
+                "system_message": system_message,
+                "user_message": user_message,
+                "api_settings": api_settings,
+            },
+            response,
+            step_name,
+        )
+        if not response:
+            raise LinguisticQABlockedError("Independent reviewer returned no response")
+        review = json.loads(response)
+        if not isinstance(review, dict):
+            raise LinguisticQABlockedError("Independent review must be a JSON object")
+        if review.get("candidate_sha256") != sha256_text(candidate):
+            raise LinguisticQABlockedError("Independent reviewer hash mismatch")
+        verdict = review.get("verdict")
+        findings = review.get("findings")
+        if verdict not in {"PASS", "REPAIR", "ESCALATE"}:
+            raise LinguisticQABlockedError("Independent review verdict is invalid")
+        if not isinstance(findings, list):
+            raise LinguisticQABlockedError("Independent review findings must be an array")
+        normalized_findings = []
+        for index, finding in enumerate(findings):
+            if not isinstance(finding, dict):
+                raise LinguisticQABlockedError("Independent review finding is invalid")
+            normalized = dict(finding)
+            normalized.setdefault("span_id", f"finding-{index + 1}")
+            normalized.setdefault("category", "linguistic-conventions")
+            normalized.setdefault("severity", "major")
+            normalized.setdefault("status", "open")
+            normalized_findings.append(normalized)
+        return {"verdict": verdict, "findings": normalized_findings}
+
+    def _run_linguistic_repair(
+        self,
+        contract: Dict[str, Any],
+        source_content: Any,
+        candidate: str,
+        findings: list,
+        step_name: str,
+    ) -> str:
+        """Repair a candidate in a separate request after independent findings."""
+        prompt_key = (
+            "norwegian_linguistic_repair"
+            if contract.get("locale") == "nb-NO"
+            else "target_language_linguistic_repair"
+        )
+        prompt = self.prompts.get(prompt_key, {})
+        if not prompt:
+            raise LinguisticQABlockedError("Linguistic repair prompt is missing")
+        user_message = prompt.get("user_template", "").format(
+            contract=json.dumps(contract, ensure_ascii=False, indent=2),
+            source_content=self._serialize_qa_value(source_content),
+            candidate=candidate,
+            findings=json.dumps(findings, ensure_ascii=False, indent=2),
+        )
+        system_message = prompt.get("system_message", "")
+        api_settings = prompt.get("api_settings", {})
+        response = self.openai_client.simple_request(
+            user_message,
+            system_message,
+            **self._build_api_override_kwargs(api_settings),
+        )
+        self._log_api_call(
+            {
+                "system_message": system_message,
+                "user_message": user_message,
+                "api_settings": api_settings,
+            },
+            response,
+            step_name,
+        )
+        if not response:
+            raise LinguisticQABlockedError("Repair returned no response")
+        repaired = json.loads(response)
+        output = repaired.get("output") if isinstance(repaired, dict) else None
+        if not isinstance(output, str) or not output.strip():
+            raise LinguisticQABlockedError("Repair output is invalid")
+        return output.strip()
+
+    def _write_qa_receipt(
+        self,
+        *,
+        status: str,
+        contract: Dict[str, Any],
+        evidence: list,
+        findings: list,
+        cycles: int,
+        verdict: str,
+        final_text: str,
+        step_name: str,
+    ) -> str:
+        """Write a validated receipt for the exact reviewed candidate."""
+        model = self.openai_client.model
+        receipt = build_receipt(
+            status=status,
+            generator_id=f"InferAnki:{model}:generator",
+            reviewer_id=f"InferAnki:{model}:clean-reviewer",
+            verdict=verdict,
+            contract=contract,
+            evidence=evidence,
+            findings=findings,
+            cycles=cycles,
+            final_text=final_text,
+        )
+        path = write_receipt(self.log_dir, step_name, receipt)
+        prune_log_files(
+            self.log_dir,
+            "linguistic-qa-*.json",
+            self.config.get("qa_receipt_max_files", 100),
+        )
+        return path
+
+    def run_linguistic_qa_gate(
+        self,
+        source_content: Any,
+        generated_text: str,
+        step_name: str,
+        additional_context: Optional[Any] = None,
+        purpose: str = "Norwegian learner-facing content",
+        artifact_kind: str = "plain_text",
+        contract_override: Optional[Dict[str, Any]] = None,
+        evidence_override: Optional[list] = None,
+    ) -> str:
+        """Run corpus evidence, clean review, repair, and mandatory re-review."""
+        if not generated_text or not self.config.get("corpus_eval_enabled", True):
+            return generated_text
+        contract = contract_override or build_inferanki_contract(
+            purpose, source_content, additional_context, artifact_kind
+        )
+        current = generated_text.strip()
+        max_cycles = max(1, min(3, int(self.config.get("corpus_eval_max_cycles", 3))))
+        all_findings = []
+        evidence = []
+        cycle = 1
+        receipt_written = False
+        try:
+            for cycle in range(1, max_cycles + 1):
+                if not self._validate_qa_candidate(current, artifact_kind):
+                    raise LinguisticQABlockedError(
+                        f"Candidate violates {artifact_kind} output contract"
+                    )
+                if evidence_override is not None:
+                    evidence = list(evidence_override)
+                else:
+                    corpus = self.get_corpus_evidence(source_content, current)
+                    if corpus.get("status") != "ok":
+                        raise LinguisticQABlockedError(
+                            f"Corpus evidence is {corpus.get('status', 'unavailable')}"
+                        )
+                    evidence = build_evidence_entries(corpus)
+                    if self.config.get("corpus_collocations_enabled", True):
+                        collocations = self.get_collocation_evidence(source_content)
+                        if (
+                            self.config.get("corpus_collocations_required", True)
+                            and collocations.get("status") not in {"ok", "empty"}
+                        ):
+                            raise LinguisticQABlockedError(
+                                "Collocation evidence is "
+                                f"{collocations.get('status', 'unavailable')}"
+                            )
+                        if collocations.get("status") in {"ok", "empty"}:
+                            evidence.extend(
+                                build_collocation_evidence_entries(collocations)
+                            )
+                review = self._run_clean_linguistic_review(
+                    contract,
+                    source_content,
+                    current,
+                    evidence,
+                    f"{step_name}_REVIEW_{cycle}",
+                )
+                verdict = review["verdict"]
+                findings = review["findings"]
+                if verdict == "PASS":
+                    if not self._validate_qa_candidate(current, artifact_kind):
+                        raise LinguisticQABlockedError(
+                            f"Reviewed candidate violates {artifact_kind} contract"
+                        )
+                    for finding in all_findings:
+                        finding["status"] = "closed"
+                    all_findings.extend(findings)
+                    self._write_qa_receipt(
+                        status="VERIFIED",
+                        contract=contract,
+                        evidence=evidence,
+                        findings=all_findings,
+                        cycles=cycle,
+                        verdict="PASS",
+                        final_text=current,
+                        step_name=step_name,
+                    )
+                    receipt_written = True
+                    return current
+                all_findings.extend(findings)
+                if verdict == "ESCALATE" or cycle == max_cycles:
+                    self._write_qa_receipt(
+                        status="NEEDS_HUMAN_REVIEW",
+                        contract=contract,
+                        evidence=evidence,
+                        findings=all_findings,
+                        cycles=cycle,
+                        verdict=verdict,
+                        final_text=current,
+                        step_name=step_name,
+                    )
+                    receipt_written = True
+                    raise LinguisticQABlockedError(
+                        "Linguistic QA requires human review"
+                    )
+                current = self._run_linguistic_repair(
+                    contract,
+                    source_content,
+                    current,
+                    findings,
+                    f"{step_name}_REPAIR_{cycle}",
+                )
+        except LinguisticQABlockedError:
+            if not receipt_written:
+                try:
+                    self._write_qa_receipt(
+                        status="BLOCKED",
+                        contract=contract,
+                        evidence=evidence,
+                        findings=all_findings + [{
+                            "span_id": "qa-gate",
+                            "category": "consistency",
+                            "severity": "blocker",
+                            "diagnosis": "Mandatory linguistic gate did not complete",
+                            "status": "open",
+                        }],
+                        cycles=cycle,
+                        verdict="ESCALATE",
+                        final_text=current,
+                        step_name=step_name,
+                    )
+                except Exception:
+                    pass
+            raise
+        except Exception as error:
+            blocker = {
+                "span_id": "qa-runtime",
+                "category": "consistency",
+                "severity": "blocker",
+                "diagnosis": type(error).__name__,
+                "status": "open",
+            }
+            try:
+                self._write_qa_receipt(
+                    status="BLOCKED",
+                    contract=contract,
+                    evidence=evidence,
+                    findings=all_findings + [blocker],
+                    cycles=cycle,
+                    verdict="ESCALATE",
+                    final_text=current,
+                    step_name=step_name,
+                )
+            except Exception:
+                pass
+            raise LinguisticQABlockedError(
+                f"Linguistic QA failed: {type(error).__name__}"
+            ) from error
+
+    def review_examples_with_corpus(
+        self,
+        source_content: Any,
+        generated_text: str,
+        step_name: str,
+        additional_context: Optional[Any] = None,
+    ) -> str:
+        """Verify generated examples before they enter an Anki field."""
+        return self.run_linguistic_qa_gate(
+            source_content,
+            generated_text,
+            step_name,
+            additional_context,
+            "Norwegian usage examples for an adult learner",
+            "examples_text",
+        )
+
+    def verify_word_stack_with_linguistic_qa(
+        self,
+        input_word: str,
+        analysis: Dict[str, Any],
+    ) -> Dict[str, Any]:
+        """Independently verify the complete CardCraft word-stack JSON."""
+        candidate = json.dumps(analysis, ensure_ascii=False, indent=2)
+        verified_text = self.run_linguistic_qa_gate(
+            {"input_word": input_word, "required_schema": list(analysis.keys())},
+            candidate,
+            "STEP1C_WORD_STACK_LINGUISTIC_QA",
+            None,
+            "CardCraft morphology and modern Bokmål word-family selection",
+            "word_stack_json",
+        )
+        verified = json.loads(verified_text)
+        if not self._validate_analysis(verified):
+            raise LinguisticQABlockedError("Verified word stack has invalid structure")
+        return verified
+
+    def verify_target_word_stack_translation(
+        self,
+        source_word_stack: Dict[str, Any],
+        translated_word_stack: Dict[str, Any],
+    ) -> Dict[str, Any]:
+        """Verify target-language lexical fidelity with an explicit locale profile."""
+        target_language = self.config.get("field_1_response_lang", "English")
+        contract = build_target_language_contract(
+            target_language,
+            source_word_stack,
+        )
+        evidence = build_translation_evidence_entries(source_word_stack, contract)
+        candidate = json.dumps(
+            translated_word_stack,
+            ensure_ascii=False,
+            indent=2,
+        )
+        verified_text = self.run_linguistic_qa_gate(
+            source_word_stack,
+            candidate,
+            "STEP2B_TARGET_LANGUAGE_LINGUISTIC_QA",
+            None,
+            contract["purpose"],
+            "word_stack_json",
+            contract,
+            evidence,
+        )
+        verified = json.loads(verified_text)
+        if not self._validate_analysis(verified):
+            raise LinguisticQABlockedError(
+                "Verified target-language word stack has invalid structure"
+            )
+        return verified
+
+    def verify_rendered_anki_field(
+        self,
+        source_content: Any,
+        rendered_html: str,
+        step_name: str,
+    ) -> str:
+        """Verify and hash the exact HTML artifact released into Anki."""
+        return self.run_linguistic_qa_gate(
+            source_content,
+            rendered_html,
+            step_name,
+            None,
+            "Complete rendered Norwegian learner field",
+            "anki_html",
+        )
+
+    def _validate_qa_candidate(self, candidate: str, artifact_kind: str) -> bool:
+        """Enforce artifact syntax independently from linguistic judgment."""
+        if not isinstance(candidate, str) or not candidate.strip():
+            return False
+        stripped = candidate.strip()
+        if artifact_kind == "word_stack_json":
+            try:
+                parsed = json.loads(stripped)
+            except json.JSONDecodeError:
+                return False
+            if "**" in stripped or "<b>" in stripped.lower():
+                return False
+            return self._validate_analysis(parsed)
+        if artifact_kind in {"examples_text", "description_text"}:
+            if stripped.startswith(("{", "[", "```")):
+                return False
+            return True
+        if artifact_kind == "anki_html":
+            if stripped.startswith(("{", "[", "```")):
+                return False
+            without_allowed_tags = re.sub(
+                r"<br\s*/?>|</?(?:b|i)>",
+                "",
+                stripped,
+                flags=re.IGNORECASE,
+            )
+            return re.search(r"<[A-Za-z][^>]*>", without_allowed_tags) is None
+        return True
+
     def _validate_analysis(self, analysis: Dict[str, Any]) -> bool:        
         """Validate the structure of word analysis"""
-        # Check for new format fields including partisipp
-        required_fields = ["substantiv", "adjektiv", "adverb", "verb", "partisipp"]
-        
-        return True
+        required_fields = {"substantiv", "adjektiv", "adverb", "verb", "partisipp"}
+        if not isinstance(analysis, dict) or not required_fields.issubset(analysis):
+            return False
+        substantiv = analysis.get("substantiv")
+        if substantiv is not None and not isinstance(substantiv, list):
+            return False
+        return all(
+            analysis.get(field) is None or isinstance(analysis.get(field), str)
+            for field in ("adjektiv", "adverb", "verb", "partisipp")
+        )
     
     def _clean_null_patterns(self, text: str) -> str:
         """Clean ugly null patterns from AI responses but keep the valid word part"""
@@ -586,6 +1068,14 @@ class NorwegianWordAnalyzer:
             }
             self._log_api_call(request_data, response, "STEP3_NORWEGIAN_DESCRIPTION")
             if response:
+                response = self.run_linguistic_qa_gate(
+                    word_stack,
+                    response,
+                    "STEP3B_DESCRIPTION_LINGUISTIC_QA",
+                    None,
+                    "Concise Norwegian learner-facing semantic explanation",
+                    "description_text",
+                )
                 # Try to parse response as JSON first (in case GPT returned array)
                 try:
                     import json
@@ -658,6 +1148,12 @@ class NorwegianWordAnalyzer:
               # Build user message
             user_template = examples_prompt.get("user_template", "")
             user_message = user_template.format(word_stack_json=norwegian_json_str)
+            corpus_evidence = self.get_corpus_evidence(norwegian_json)
+            collocation_evidence = self.get_collocation_evidence(norwegian_json)
+            user_message += self.corpus_client.format_for_prompt(corpus_evidence)
+            user_message += self.corpus_client.format_collocations_for_prompt(
+                collocation_evidence
+            )
             
             # Get system message
             system_message = examples_prompt.get("system_message", "")            # Build few-shot examples from examples field
@@ -709,7 +1205,21 @@ class NorwegianWordAnalyzer:
                 examples_list,
                 **override_kwargs
             )
+            request_data = {
+                "system_message": system_message,
+                "examples": examples_list,
+                "user_message": user_message,
+                "corpus_evidence": corpus_evidence,
+                "collocation_evidence": collocation_evidence,
+                "api_settings": api_settings,
+            }
+            self._log_api_call(request_data, response, "STEP4_NORWEGIAN_EXAMPLES_SIMPLE")
             if response:
+                response = self.review_examples_with_corpus(
+                    norwegian_json,
+                    response,
+                    "STEP4B_CORPUS_REVIEW_SIMPLE_EXAMPLES",
+                )
                 # Apply hardcoded processing: make noen, ens, noe italic
                 processed_response = response.strip()
                 
@@ -767,6 +1277,12 @@ class NorwegianWordAnalyzer:
                 word_stack_json=norwegian_json_str,
                 user_context=user_context
             )
+            corpus_evidence = self.get_corpus_evidence(norwegian_json)
+            collocation_evidence = self.get_collocation_evidence(norwegian_json)
+            user_message += self.corpus_client.format_for_prompt(corpus_evidence)
+            user_message += self.corpus_client.format_collocations_for_prompt(
+                collocation_evidence
+            )
             
             # Get system message
             system_message = sentences_prompt.get("system_message", "")
@@ -808,12 +1324,25 @@ class NorwegianWordAnalyzer:
                 "examples": examples_list,
                 "user_message": user_message,
                 "user_context": user_context,
+                "corpus_evidence": corpus_evidence,
+                "collocation_evidence": collocation_evidence,
                 "api_settings": api_settings
             }
             self._log_api_call(request_data, response, "STEP5_NORWEGIAN_SENTENCES")
             if response:
+                response = self.review_examples_with_corpus(
+                    norwegian_json,
+                    response,
+                    "STEP5B_CORPUS_REVIEW_SENTENCES",
+                    user_context,
+                )
                 # Clean null patterns and return response text
                 cleaned_response = self._clean_null_patterns(response.strip())
+                cleaned_response = "\n".join(
+                    line.strip()
+                    for line in cleaned_response.splitlines()
+                    if line.strip()
+                )
                 return cleaned_response
             else:
                 showCritical("No response from sentences API")

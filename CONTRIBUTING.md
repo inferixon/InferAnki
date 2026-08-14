@@ -39,7 +39,7 @@ Thank you for your interest in contributing to InferAnki! 🎉
 - Use English for code comments
 - Follow existing code patterns
 - Add logging for debugging when needed
-- Keep Ukrainian language for user-facing documentation
+- Keep paired English and Ukrainian documentation consistent
 
 ## Questions?
 

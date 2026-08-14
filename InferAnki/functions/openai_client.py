@@ -4,8 +4,10 @@
 import json
 import urllib.request
 import urllib.parse
+import urllib.error
 import ssl
 import threading
+import time
 
 try:
     from aqt.utils import showInfo, showCritical # type: ignore
@@ -25,7 +27,7 @@ class OpenAIClient:
     def __init__(self, config):
         self.config = config
         self.api_key = config.get("openai_api_key", "")
-        self.model = config.get("openai_default_model", "gpt-4.1")  # Use default_model as fallback
+        self.model = config.get("openai_default_model", "gpt-5.6-terra")
         self.temperature = config.get("ai_temperature", 0.3)
         self.max_tokens = config.get("ai_max_tokens", 1500)
         self.reasoning_effort = config.get("openai_reasoning_effort", "medium")
@@ -35,6 +37,8 @@ class OpenAIClient:
         # Network timeout (seconds). Long responses (e.g., PROOFREAD diffs) can exceed 30s.
         # Keep it configurable but safe-by-default.
         self.timeout_seconds = self._get_timeout_seconds()
+        self.max_retries = self._get_max_retries()
+        self.retry_base_seconds = self._get_retry_base_seconds()
         
         # Check availability
         self.enabled = self._check_availability()
@@ -110,41 +114,77 @@ class OpenAIClient:
             timeout = 120
         # Clamp to avoid accidental extremes
         return max(30, min(600, timeout))
+
+    def _get_max_retries(self) -> int:
+        """Get the bounded number of retries for transient failures."""
+        try:
+            retries = int(self.config.get("openai_max_retries", 2))
+        except (TypeError, ValueError):
+            retries = 2
+        return max(0, min(4, retries))
+
+    def _get_retry_base_seconds(self) -> float:
+        """Get the bounded exponential-backoff base delay."""
+        try:
+            delay = float(self.config.get("openai_retry_base_seconds", 0.75))
+        except (TypeError, ValueError):
+            delay = 0.75
+        return max(0.1, min(5.0, delay))
+
+    def _retry_delay(self, attempt: int, retry_after=None) -> float:
+        """Return a bounded delay, respecting numeric Retry-After values."""
+        if retry_after is not None:
+            try:
+                return max(0.0, min(30.0, float(retry_after)))
+            except (TypeError, ValueError):
+                pass
+        return min(8.0, self.retry_base_seconds * (2 ** attempt))
     
     def _make_request(self, endpoint, data):
         """Make HTTP request to OpenAI API"""
-        try:
-            url = f"{self.base_url}/{endpoint}"
-            
-            # Prepare headers
-            headers = {
-                'Content-Type': 'application/json',
-                'Authorization': f'Bearer {self.api_key}',
-                'User-Agent': 'InferAnki-CardCraft/1.0'
-            }
-            
-            # Prepare request
-            json_data = json.dumps(data).encode('utf-8')
+        url = f"{self.base_url}/{endpoint}"
+        headers = {
+            'Content-Type': 'application/json',
+            'Authorization': f'Bearer {self.api_key}',
+            'User-Agent': 'InferAnki-CardCraft/1.0'
+        }
+        json_data = json.dumps(data).encode('utf-8')
+        ssl_context = ssl.create_default_context()
+
+        for attempt in range(self.max_retries + 1):
             req = urllib.request.Request(url, data=json_data, headers=headers)
-            
-            # Create SSL context (for HTTPS)
-            ssl_context = ssl.create_default_context()
-            
-            # Make request
-            with urllib.request.urlopen(req, context=ssl_context, timeout=self.timeout_seconds) as response:
-                response_data = json.loads(response.read().decode('utf-8'))
-                return {"success": True, "data": response_data}
-                
-        except urllib.error.HTTPError as e: # type: ignore
-            error_body = e.read().decode('utf-8')
             try:
-                error_data = json.loads(error_body)
-                error_msg = error_data.get('error', {}).get('message', f'HTTP {e.code}')
-            except:
-                error_msg = f'HTTP {e.code}: {error_body}'
-            return {"success": False, "error": error_msg}
-        except Exception as e:
-            return {"success": False, "error": str(e)}
+                with urllib.request.urlopen(
+                    req,
+                    context=ssl_context,
+                    timeout=self.timeout_seconds,
+                ) as response:
+                    response_data = json.loads(response.read().decode('utf-8'))
+                    return {"success": True, "data": response_data}
+            except urllib.error.HTTPError as error:
+                try:
+                    error_body = error.read().decode('utf-8', errors='replace')
+                finally:
+                    error.close()
+                retryable = error.code == 429 or 500 <= error.code <= 599
+                if retryable and attempt < self.max_retries:
+                    time.sleep(self._retry_delay(attempt, error.headers.get('Retry-After')))
+                    continue
+                try:
+                    error_data = json.loads(error_body)
+                    error_msg = error_data.get('error', {}).get('message', f'HTTP {error.code}')
+                except (TypeError, ValueError):
+                    error_msg = f'HTTP {error.code}: {error_body}'
+                return {"success": False, "error": error_msg}
+            except (urllib.error.URLError, TimeoutError, OSError) as error:
+                if attempt < self.max_retries:
+                    time.sleep(self._retry_delay(attempt))
+                    continue
+                return {"success": False, "error": str(error)}
+            except Exception as error:
+                return {"success": False, "error": str(error)}
+
+        return {"success": False, "error": "OpenAI request failed after retries"}
     
     def _extract_response_text(self, response_data):
         """Extract text from Responses API output"""
@@ -182,7 +222,7 @@ class OpenAIClient:
         ]
         
         # Use _prepare_request_data with custom max_tokens for quick test
-        data = self._prepare_request_data(messages, custom_max_tokens=10)
+        data = self._prepare_request_data(messages, custom_max_tokens=32)
 
         result = self._make_request("responses", data)
         

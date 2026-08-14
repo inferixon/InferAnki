@@ -1,7 +1,10 @@
 # Changelog
 
-### [0.6] - 2025-08-01
-- Added ChatBot with Norwegian language assistant.
+### [0.6] - 2026-08-14
+- Added ChatGPT Assistant with quick prompts and session history.
+- Centralized AI configuration on `gpt-5.6-terra`.
+- Added corpus-backed linguistic QA for CardCraft and Examples.
+- Improved background processing and atomic card updates.
 
 ### [0.5] - 2025-08-01
 - Added Examples button for generating contextual Norwegian example sentences from existing content using user-specific context.

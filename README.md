@@ -1,155 +1,112 @@
-# InferAnki v0.6.7
+# InferAnki 0.6
 
-**AI-powered Anki add-on to help you learn Norwegian**
+AI-assisted Norwegian vocabulary tooling for the Anki Desktop card editor.
 
-## What is Anki?
+Current development build: `0.6.8`.
 
-**Anki** is a **free** flashcard app that uses **spaced repetition**. This is one of the most effective, research-backed ways to memorize information, proven by cognitive psychology studies.
+## Features
 
-**Official website:** https://apps.ankiweb.net/
+- **CardCraft** – builds a Norwegian word-family card from one word, adds a definition, usage examples, contextual sentences, and a translation in the configured target language.
+- **Examples** – adds reviewed Norwegian examples to existing field 2 content. Append `* your instruction` to request a specific context.
+- **TTS** – generates Norwegian audio through ElevenLabs and attaches it to the note.
+- **ChatGPT Assistant** – provides free-form chat, eight configurable quick prompts, clipboard actions, and session-local conversation history. Open it from the editor, the Anki toolbar, the Tools menu, or with `Ctrl+G`.
 
-Anki is available on both computers and smartphones—so you can study anywhere, with your progress synced via the cloud.
+CardCraft and Examples can use frequency and collocation evidence from the National Library of Norway DH-LAB corpus. Generated Norwegian and target-language content passes independent review and repair loops before it is written to the note. Long-running AI and TTS work runs outside the UI thread, and generated card fields are applied together only after the pipeline succeeds.
 
-### Scientific Background
+## Requirements
 
-**Ebbinghaus’ Forgetting Curve** (1885) shows how quickly we lose new information.
+- Anki Desktop `2.1.45` or newer
+- An internet connection for AI, corpus, and TTS requests
+- An OpenAI API key for CardCraft, Examples, and ChatGPT Assistant
+- An ElevenLabs API key only if TTS is used
 
-Without review, we forget:
-- **50%** of information in 20 minutes
-- **70%** in a day
-- **90%** in a week
-
-**Spaced repetition** changes this: by reviewing material at optimal intervals, you move information from short-term to long-term memory with minimal effort.
-
-### How does Anki work?
-
-Anki calculates **optimal review intervals** for each card. After seeing a card, you rate how hard it was to recall, and Anki automatically schedules the next review:
-- “Easy” cards are shown less often.
-- “Hard” cards are reviewed more frequently.
-
-The system adapts to your learning pace.
-
-**Result:** Instead of rote memorization, you remember material efficiently and for the long term, spending just 15–20 minutes a day.
-
-### Why Anki + InferAnki?
-
-InferAnki brings **AI power** to Anki. It adds four buttons to the card editor toolbar:
-
-- ✨ **CardCraft**: Generate a complete card from a single word. GPT-5.2 finds related words, definitions, usage examples, and adds a translation in your chosen language.
-- 📝 **Examples**: Create extra examples from the text in field 2.
-- 👩🏼 **TTS**: Generate high-quality AI Norwegian audio for your text.
-- ☀️ **ChatGPT Assistant**: Chat with GPT-5.2 for detailed help, with quick prompts and copy-to-clipboard (e.g., for translations).
-
-The add-on uses custom prompts to control AI quality. You can flexibly adjust these prompts to your needs.
-
-## System Requirements
-
-⚠️ **Important:** This add-on works **only on the Windows Desktop version of Anki**
-
- **Why:** The add-on integrates directly into the Anki Desktop card editor using system hooks, Windows-specific file paths, and the built-in Python environment in Anki Desktop. This means you can only run the add-on on Windows, but you can use the generated cards (with audio) on other platforms.
-
-### You need:
-- ✅ **Windows 10 or newer**
-- ✅ **Latest Anki Desktop for Windows**
-- ✅ **Built-in Python and Qt** (included with Anki)
-
-### NOT supported:
-- ❌ AnkiWeb (browser version)
-- ❌ AnkiMobile (iOS app)
-- ❌ AnkiDroid (Android app)
-- ❌ macOS/Linux (for now)
+The add-on is developed and tested on Windows 10/11. AnkiWeb and Anki mobile clients cannot run desktop add-ons, but they can display synced cards and audio created by InferAnki. Other desktop operating systems are not currently tested.
 
 ## Installation
 
-### Prepare your API keys
+1. Download or clone this repository.
+2. Copy the `InferAnki` folder to `%APPDATA%\Anki2\addons21\`.
+3. Open the copied `InferAnki/config.json`.
+4. Replace `YOUR_OPENAI_API_KEY_HERE` with your OpenAI API key.
+5. If using TTS, replace `YOUR_ELEVENLABS_API_KEY_HERE` with your ElevenLabs API key. The bundled configuration uses the Emma voice by default.
+6. Restart Anki.
 
-**OpenAI API key**
-- Go to: https://platform.openai.com/
-- Sign up/log in
-- Create an API key in the API Keys section and save it securely!
+InferAnki expects at least two note fields:
 
-**ElevenLabs API key**
-- Go to: https://try.elevenlabs.io/l8ypk48ku2uk
-- Sign up/log in
-- Create an API key in Account Settings and save it securely!
-- Choose your preferred voice and save its id
+- **Field 1** – translation in `field_1_response_lang`
+- **Field 2** – Norwegian source and generated learning content
 
-### Add-on Setup
-
-1. Make sure you have the latest Anki for Windows: https://apps.ankiweb.net/
-2. Copy the entire `InferAnki` folder to: `%APPDATA%\Anki2\addons21\`
-3. Open `config.json` in any code editor.
-4. Add your API keys to `config.json`:
-   - Add your OpenAI API key to `openai_api_key`
-   - Add your ElevenLabs API key to `elevenlabs_api_key`
-   - Add your voice id to `elevenlabs_voice_id`
-5. Start Anki
-6. Set up fields 1 and 2 as shown in Card setup images 1–3
+Field names do not matter; the add-on uses field positions.
 
 ## Usage
 
-1. Open the Anki card editor (Add/Edit card)
-2. Enter a Norwegian word in field 2
-3. Use the toolbar buttons:
-   - ✨ **CardCraft** – add full content to field 2 and translation to field 1
-   - 📝 **Examples** – add relevant usage examples to field 2 (field 2 must have at least one Norwegian word)
-   - 👩🏼 **TTS-Emma** – add audio for field 2
-   - ☀️ **ChatGPT Assistant** – open the AI chat window
+Open the Add or Edit window and use the editor buttons:
 
-## Other Settings
+- `✨` – run CardCraft for the Norwegian word in field 2
+- `📝` – generate additional examples from field 2
+- `👩🏼` – generate ElevenLabs audio from field 2
+- `☀️` – open ChatGPT Assistant
 
-Edit `config.json` to adjust:
-- TTS voice parameters
-- AI model settings
-- Translation language
-- Debug mode
+Examples supports a one-off instruction after an asterisk. For example:
 
-### Translation language – field 1
-
-By default, AI generates translations in field 1 in English. Any language is possible—even Klingon 👽. To change the translation language (e.g., to Klingon), open `config.json` and set:
-
-```json
-{
-    "field_1_response_lang": "Klingon"
-}
+```text
+et sjakkbrett * use only chess-related situations
 ```
 
-**Note:** The add-on uses field indexes in code—field names in Anki do not affect the add-on!
+## Configuration
 
-**Context settings**
+`config.json` is the single source of truth for shared runtime settings.
 
-To personalize AI-generated examples for your field/interests:
+| Setting | Purpose |
+| --- | --- |
+| `openai_default_model` | Shared OpenAI model; default is `gpt-5.6-terra` |
+| `openai_reasoning_effort` | Shared reasoning level |
+| `openai_text_verbosity` | Shared response verbosity |
+| `field_1_response_lang` | Translation language written to field 1 |
+| `user_lang` | User-language value available to ChatGPT prompt templates |
+| `chatbot_max_history` | Number of completed message pairs retained per dialog |
+| `tts_enabled` | Enables or disables ElevenLabs TTS |
+| `corpus_enabled` | Enables Norwegian corpus evidence |
+| `corpus_eval_enabled` | Enables corpus-backed review and repair loops |
+| `debug_mode` | Enables additional diagnostics |
 
-1. Open: `prompts.json`
-2. Find: `"user_context": []`
-3. Replace with your context, e.g.:
-   - Medicine: `["medisin", "helse", "sykehus"]`
-   - Business: `["økonomi", "business", "ledelse"]`
-   - IT: `["programmering", "teknologi", "data"]`
-   - Education: `["utdanning", "skole", "læring"]`
-   - Law: `["jus", "lov", "rettsvesen"]`
+Prompt-specific token limits and exceptional model overrides live in `prompts.json`. Normally, change the shared model only in `config.json`.
 
-This makes AI examples more relevant to your field when learning Norwegian vocabulary.
+### Personal context
 
-### Chatbot settings
-
-**Full documentation:** See `ChatBot-uk.md` for quick prompts, translation buttons, and clipboard copy setup.
-
-**Conversation memory**: The chatbot remembers the last 10 message pairs within each dialog session for coherent multi-turn conversations. Each new window starts fresh.
-
-## Support
-
-- CardCraft pipeline logs: check `InferAnki/logs/convert-*.log` inside the add-on folder
-- Enable `debug_mode` in `config.json` for more visible error dialogs
-
-### Optional: prevent request timeouts
-
-If you generate very long answers (e.g., PROOFREAD with visual diff), you can increase the HTTP timeout:
+The public preset contains empty `user_context` arrays. To bias generated examples toward your interests, replace the relevant arrays in `prompts.json`, for example:
 
 ```json
-{
-   "openai_timeout_seconds": 300
-}
+"user_context": ["medisin", "helse", "sykehus"]
 ```
 
-### IMPORTANT! RESTART ANKI AFTER ANY SETTINGS CHANGE!!!
+Keep the values short and concrete. Quick prompts are configured separately under `chatbot.quick_prompts`.
+
+### Corpus evaluation
+
+The default corpus settings query Norwegian newspaper material from 2000–2025 through the DH-LAB API. Frequency evidence helps reject implausible or obsolete forms; collocation evidence helps prefer attested modern usage. The corpus client itself fails open when the service is unavailable, while required evaluation stages may stop a generated result rather than write weak content to the note.
+
+Corpus behavior can be adjusted with the `corpus_*` settings in `config.json`.
+
+## Logs and troubleshooting
+
+- Restart Anki after changing `config.json` or `prompts.json`.
+- CardCraft logs: `InferAnki/logs/convert-*.log`
+- Linguistic QA receipts: `InferAnki/logs/linguistic-qa-*.json`
+- Increase `openai_timeout_seconds` in `config.json` if long requests time out.
+- Set `debug_mode` to `true` for more visible error dialogs.
+- API calls use your own OpenAI and ElevenLabs accounts and may incur provider charges.
+
+For ChatGPT Assistant customization, see [ChatBot.md](ChatBot.md). Ukrainian documentation is available in [README-uk.md](README-uk.md) and [ChatBot-uk.md](ChatBot-uk.md).
+
+## Screenshots
+
+![CardCraft](images/CardCraft-01.jpg)
+
+![Examples](images/Examples-01.jpg)
+
+![ChatGPT Assistant](images/Chatbot.jpg)
+
+## Contributing
+
+Bug reports and pull requests are welcome. See [CONTRIBUTING.md](CONTRIBUTING.md).
