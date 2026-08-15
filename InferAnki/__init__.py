@@ -10,7 +10,11 @@ from datetime import datetime
 from .functions.tts_handler import ElevenLabsTTSProcessor 
 from .functions.cardcraft_service import build_cardcraft_payload
 from .functions.examples_service import build_examples_payload
-from .functions.logging_utils import prune_log_files
+from .functions.background_progress import (
+    run_with_optional_progress,
+    run_with_progress,
+)
+from .functions.logging_utils import log_runtime_error, prune_log_files
 from .functions.bootstrap import load_addon_version
 
 # Create alias for backward compatibility
@@ -18,6 +22,15 @@ TTSProcessor = ElevenLabsTTSProcessor
 
 # Addon configuration
 ADDON_NAME = "InferAnki"
+
+
+def log_async_error(operation, error):
+    """Persist an asynchronous runtime error for diagnosis."""
+    logs_dir = os.path.join(os.path.dirname(__file__), "logs")
+    try:
+        log_runtime_error(logs_dir, operation, error)
+    except OSError:
+        pass
 
 def get_addon_version():
     """Get addon version from meta.json"""
@@ -337,10 +350,15 @@ def handle_tts_command(editor):
 
         note = editor.note
         text = TTS_PROCESSOR.get_field_content(editor)
+        processed_text = TTS_PROCESSOR.process_text_for_tts(text)
+        progress_threshold = int(CONFIG.get("tts_progress_threshold_chars", 50))
 
         def generate_audio():
             """Create the temporary audio file without touching Anki state."""
-            return TTS_PROCESSOR.create_audio_file(text)
+            return TTS_PROCESSOR.create_audio_file(
+                processed_text,
+                preprocessed=True,
+            )
 
         def finish_audio(future):
             """Commit generated audio on the Anki UI thread."""
@@ -359,12 +377,23 @@ def handle_tts_command(editor):
                 editor.loadNoteKeepingFocus()
                 editor.saveNow(lambda: None)
             except Exception as error:
+                log_async_error("TTS", error)
                 showCritical(f"TTS Error: {str(error)}")
             finally:
                 TTS_PROCESSOR.cleanup_temp_file(audio_path)
                 enable_tts_button(editor)
 
-        mw.taskman.run_in_background(generate_audio, finish_audio)
+        run_with_optional_progress(
+            mw,
+            generate_audio,
+            finish_audio,
+            "Creating Audio",
+            TTS_PROCESSOR.should_show_progress(
+                processed_text,
+                progress_threshold,
+            ),
+            parent=getattr(editor, "parentWindow", mw),
+        )
     except Exception as e:
         showCritical(f"TTS Error: {str(e)}")
         enable_tts_button(editor)
@@ -643,6 +672,12 @@ def handle_cardcraft_analysis(editor):
         note = editor.note
         original_fields = tuple(note.fields[:2])
 
+        def report_progress(label):
+            """Update Anki's progress label on the UI thread."""
+            mw.taskman.run_on_main(
+                lambda: mw.progress.update(label=label)
+            )
+
         def build_payload():
             """Run the complete CardCraft pipeline without touching the note."""
             return build_cardcraft_payload(
@@ -651,6 +686,7 @@ def handle_cardcraft_analysis(editor):
                 word,
                 format_analysis_result,
                 log_cardcraft_step,
+                report_progress,
             )
 
         def finish_payload(future):
@@ -668,11 +704,18 @@ def handle_cardcraft_analysis(editor):
                 editor.loadNoteKeepingFocus()
                 editor.saveNow(lambda: None)
             except Exception as error:
+                log_async_error("CardCraft", error)
                 showCritical(f"CardCraft Analysis Error: {str(error)}")
             finally:
                 enable_cardcraft_button(editor)
 
-        mw.taskman.run_in_background(build_payload, finish_payload)
+        run_with_progress(
+            mw,
+            build_payload,
+            finish_payload,
+            "Creating Word Family",
+            parent=getattr(editor, "parentWindow", mw),
+        )
     except Exception as e:
         showCritical(f"CardCraft Analysis Error: {str(e)}")
         enable_cardcraft_button(editor)
@@ -958,9 +1001,19 @@ def handle_examples_command(editor):
         
         original_norsk = note.fields[1]
 
+        def report_progress(label):
+            """Update Anki's progress label on the UI thread."""
+            mw.taskman.run_on_main(
+                lambda: mw.progress.update(label=label)
+            )
+
         def build_examples():
             """Generate and verify examples without touching the note."""
-            return generate_examples_from_content(main_content, custom_instructions)
+            return generate_examples_from_content(
+                main_content,
+                custom_instructions,
+                report_progress,
+            )
 
         def finish_examples(future):
             """Append examples only if the original note remains unchanged."""
@@ -979,18 +1032,29 @@ def handle_examples_command(editor):
                 editor.loadNoteKeepingFocus()
                 editor.saveNow(lambda: None)
             except Exception as error:
+                log_async_error("Examples", error)
                 showInfo(f"Error generating examples: {str(error)}")
             finally:
                 enable_examples_button(editor)
 
-        mw.taskman.run_in_background(build_examples, finish_examples)
+        run_with_progress(
+            mw,
+            build_examples,
+            finish_examples,
+            "Creating Examples",
+            parent=getattr(editor, "parentWindow", mw),
+        )
             
     except Exception as e:
         showInfo(f"Error in examples command: {str(e)}")
         enable_examples_button(editor)
 
 
-def generate_examples_from_content(content, custom_instructions=None):
+def generate_examples_from_content(
+    content,
+    custom_instructions=None,
+    progress=None,
+):
     """Generate and verify examples through the standalone service."""
     try:
         return build_examples_payload(
@@ -998,6 +1062,7 @@ def generate_examples_from_content(content, custom_instructions=None):
             CONFIG,
             content,
             custom_instructions,
+            progress,
         )
     except Exception as error:
         raise Exception(f"Failed to generate examples: {str(error)}") from error

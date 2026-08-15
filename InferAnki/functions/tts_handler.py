@@ -185,15 +185,28 @@ class ElevenLabsTTSProcessor:
             return ""
       
         return input_text
+
+    @staticmethod
+    def count_spoken_characters(processed_text):
+        """Count audible text characters without SSML markup."""
+        if not processed_text:
+            return 0
+        spoken_text = re.sub(r'<[^>]+>', '', processed_text)
+        return len(spoken_text.strip())
+
+    @classmethod
+    def should_show_progress(cls, processed_text, threshold=50):
+        """Show modal progress only above the configured text threshold."""
+        return cls.count_spoken_characters(processed_text) > int(threshold)
     
-    def create_audio_file(self, text):
+    def create_audio_file(self, text, preprocessed=False):
         """Create MP3 audio file using ElevenLabs TTS"""
         if not self.enabled or not REQUESTS_AVAILABLE:
             return None
             
         try:
             # Process text with SSML markup
-            processed_text = self.process_text_for_tts(text)
+            processed_text = text if preprocessed else self.process_text_for_tts(text)
             if not processed_text or not processed_text.strip():
                 return None
             

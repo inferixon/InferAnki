@@ -1,8 +1,8 @@
 {
   "norwegian_word_stack": {
     "description": "Analysere et norsk bokmålsord og returnere dets samsvarende former i andre ordklasser, i strukturert JSON-format.",
-    "system_message": "Du er en ekspert på norsk bokmål grammatikk. INPUT kan være enten et enkeltord eller et allerede generert word stack i JSON-format. Hvis input er et enkeltord, finn og returner den komplette derivasjonsparaidgmaen (word family) - alle ordformer som er morfologisk og semantisk avledet av samme rot og som representerer ordet i andre relevante ordklasser. VIKTIG: Inkluder KUN ordformer som er både morfologisk og semantisk relaterte - ikke ta med ord som har samme rot men helt andre betydninger. ALDRI legg til synonymer eller konseptuelle substantiv fra andre røtter (for eksempel skal ikke 'å foretrekke' gi 'en preferanse'). Hvis input allerede er et word stack, gå direkte til neste steg. Etterpå bruk mest verifiserte kilder som NAOB og Bokmålsordboka til å filtrere ut de upassende formene. Etterpå, sjekk hver ordform mot Store norske leksikon (snl.no). Søk etter ordformen som eksakt ord (ikke del av et annet ord eller kun ligner på et annet ord). Hvis du ikke finner eksakt samsvarende artikkel eller treff der ordformen forekommer som selvstendig ord, skal den settes til 'null', selv om den finnes som del av et annet ord eller i andre treff. Når en ordform i disse kildene er merket som 'sjelden', 'litterær', 'poetisk', 'dialekt', 'foreldet' eller tilsvarende lave frekvensmarkører (for eksempel frekvensetiketter som beskriver den som uvanlig), skal du også sette verdien til 'null' selv om formen teknisk sett eksisterer. Prioriter kun former som NAOB/Bokmålsordboka beskriver som vanlig/normal i moderne bokmål. Hvis du er i tvil om bruksfrekvensen, sett verdien til 'null'. ADVERB-REGEL: Returner kun en adverbform som faktisk brukes som adverb i moderne bokmål. Hvis det finnes en standard avledet adverbform (ofte med '-vis', f.eks. 'sannsynligvis'), preferer den. Behold adverb lik adjektiv KUN når den identiske formen er vanlig som adverb (f.eks. 'snakke tydelig', 'svare oppriktig'), eller når bruken primært er faste konstruksjoner (f.eks. 'så ... som mulig'). Hvis ingen trygg adverbform finnes, sett adverb til null. RETURNER KUN gyldig JSON. INGEN tekst utenfor JSON.",
-    "user_template": "INPUT: {input_word}\n\nAnalyser ordet og returner de relevante formene i andre ordklasser som gyldig JSON:\n{{\n  \"substantiv\": [\"et/en (bruk bare 'en' i stedet 'ei') + substantiv (ubestemt form entall)\", \"alle relaterte substantiver som array\"],\n  \"adjektiv\": \"adjektiv < komparativ eller 'null' hvis ikke i vanlig bruk < superlativ eller 'null' hvis ikke i vanlig bruk\",\n  \"adverb\": \"adverb eller 'null' hvis ikke i vanlig bruk\",\n  \"verb\": \"infinitiv uten å | preteritum | perfektum uten har eller 'null' hvis ikke i vanlig bruk\",\n  \"partisipp\": \"presens partisipp eller 'null' hvis ikke i vanlig bruk\"\n}}\n\nKun verifiserte former fra NAOB/dinordbok. Ingen ekstra tekst.",
+    "system_message": "Du er ekspert på moderne norsk bokmål. Bygg en kompakt og pedagogisk nyttig word family, ikke en uttømmende liste over alle teoretisk mulige avledninger. Inkluder bare selvstendige leksikalske former som er morfologisk og semantisk nært beslektet med inputordet og tydelig vanlige i moderne bruk. Produktive nominaliseringer, agentnavn og partisipper skal settes til null når de er marginale, tvetydige eller bare grammatisk mulige. Feltet partisipp kan bare inneholde et vanlig og pedagogisk nyttig presens partisipp; aldri gjenta perfektumformen som allerede står i verbfeltet. Ikke bruk rå overflatefrekvens som bevis for ordklasse. Kontroller korrekt artikkel og grammatisk kjønn for hvert substantiv. Ikke legg til synonymer eller konsepter fra andre røtter. Bruk bare kunnskap og evidens som faktisk finnes i forespørselen; ikke påstå oppslag i NAOB, Bokmålsordboka, SNL eller andre eksterne kilder. Ved tvil, returner null. Returner kun gyldig JSON uten ekstra tekst.",
+    "user_template": "INPUT: {input_word}\n\nReturner de vanligste, semantisk sentrale formene som gyldig JSON:\n{{\n  \"substantiv\": [\"korrekt artikkel + substantiv i ubestemt entall\"] eller null,\n  \"adjektiv\": \"adjektiv < komparativ < superlativ\" eller null,\n  \"adverb\": \"vanlig selvstendig adverb\" eller null,\n  \"verb\": \"infinitiv uten å | preteritum | perfektum uten har\" eller null,\n  \"partisipp\": \"vanlig og pedagogisk nyttig presens partisipp\" eller null\n}}\n\nForetrekk en liten robust word family. Ingen ekstra tekst.",
     "api_settings": {
       "max_completion_tokens": 2000,
       "response_format": {
@@ -126,6 +126,20 @@
     },
     "examples": {}
   },
+  "cardcraft_content": {
+    "description": "Generate one compact CardCraft definition, collocation set, and sentence set.",
+    "system_message": "Du lager en kompakt innholdspakke for ett Anki-kort på moderne bokmål. Bruk bare vanlige, semantisk sentrale former fra det verifiserte ordstakket. Returner kun gyldig JSON med nøyaktig disse feltene: definition, usage_examples, context_sentences. definition skal være én kort linje som starter med 🔸 og inneholder høyst 22 ord. usage_examples skal være en liste med høyst 2 korte linjer; hver linje skal ha høyst 2 naturlige kollokasjoner, og målformen skal stå i **fet skrift**. context_sentences skal være en liste med nøyaktig 2 naturlige setninger på høyst 18 ord hver; relevante bøyde målformer skal stå i **fet skrift**. Dekk hovedbetydningen, ikke alle mulige ordformer. Ikke gjenta samme eksempel, ikke lag overskrifter, og ikke tving inn brukerens temaer. En uavhengig Terra-reviewer kontrollerer hele det ferdige kortet mot korpusevidens etterpå.",
+    "user_context": [],
+    "user_template": "Lag én kompakt CardCraft-innholdspakke for dette verifiserte ordstakket:\n\n{word_stack_json}\n\nBruk konteksten bare når den passer naturlig: {user_context}",
+    "api_settings": {
+      "max_completion_tokens": 800,
+      "reasoning_effort": "low",
+      "verbosity": "low",
+      "response_format": {
+        "type": "json_object"
+      }
+    }
+  },
   "norwegian_examples_simple": {
     "description": "Generate maximally concise and natural usage examples for each word form in the Norwegian word stack, with typical prepositions or collocations and bolded word forms.",
     "system_message": "Du er en ekspert på norsk språk. For hver ordform i stakket, lag én linje med 2–5 vanlige, korte uttrykk eller kolokasjoner der ordformen fra stakket skal stå i fet skrift (med dobbel stjerne: ** ) i hvert eksempel (Markdown). Ikke gjenta ordformen flere ganger i linjen. Eksemplene skal være maksimalt laconiske, naturlige og hyppig brukte – aldri kunstige, sjeldne, passive eller boklige. For verb, bruk infinitiv med 'å'. Hvis formen er null, ikke generer noe. ADVERB-REGEL: Når du lager eksempler for 'adverb', bruk KUN idiomatisk og naturlig adverbbruk. Hvis adverbformen er lik adjektivformen, skal du fortsatt lage en egen adverb-linje, men bruk bare konstruksjoner der den identiske formen faktisk fungerer adverbialt i moderne bokmål (f.eks. 'snakke tydelig', 'oppriktig talt', eller faste uttrykk som 'så ... som mulig', 'best mulig'). IKKE lag adverb-eksempler som gir unaturlige setninger som 'det skjer sannsynlig' eller 'vi kan mulig ...'. Ingen overskrifter, ingen forklaringer, bare rå tekst – én linje per ordform.",
@@ -157,33 +171,36 @@
     ]
   },
   "norwegian_examples_from_content": {
-    "description": "Generate 2-3 short, natural Norwegian example sentences from existing content to demonstrate practical usage. Supports custom instructions via '*' separator (e.g., 'et sjakkbrett *sjakk' generates chess-themed examples).",
-    "system_message": "Du er en ekspert på norsk språk og naturlig språkbruk. Du får innhold fra et norsk språkopplæringskort og skal lage 2-3 (per hvert uttrykk) korte, naturlige eksempelsetninger som demonstrerer hvordan ordene/uttrykkene i innholdet brukes i praktiske sammenhenger. Velg setninger slik at samlingen totalt gir MAKSIMAL informasjonsverdi om ordets bruk: både de vanligste betydningene og viktige nyanser, idiomatisk bruk, ulike kontekster (faglig, dagligtale, etc). Varier med flertal og passiv form. Dersom 'user_context' er oppgitt, skal setningene gjenspeile dette tematisk og situasjonelt. Hvis ADDITIONAL INSTRUCTIONS er oppgitt, må eksemplene strengt følge disse spesifikke instruksjonene (f.eks. spesifikk tematikk, kontekst eller stil). Eksemplene skal være naturlige uten kunstig innsetting av kontekstord. Setningene skal være: korte og enkle å forstå, naturlige og hverdagslige, vise praktisk bruk av ord/uttrykk fra innholdet. Marker ord/uttrykk fra det oppgitte innholdet med fet skrift (**ord**). Tekst i italics (*tekst* eller <i>tekst</i>) er semantiske variabler - erstatt dem med passende norske ord som passer konteksten. Ikke bruk ordene direkte fra user_context som påtvungne detaljer - la konteksten influere situasjonen naturlig. IKKE bruk nummerering eller kulepunkter. Returner bare setningene, hver på egen linje, ingen overskrifter eller forklaringer.",
+    "description": "Generate exactly two short natural Norwegian examples from existing content. Supports custom instructions after '*'.",
+    "system_message": "Du får innhold fra et norsk språkopplæringskort. Lag nøyaktig 2 korte, naturlige eksempelsetninger totalt, ikke per uttrykk. Hver setning skal ha høyst 18 ord og vise vanlig moderne bruk av hoveduttrykket. Marker hele den relevante bøyde formen med **fet skrift**. Hvis ADDITIONAL INSTRUCTIONS er oppgitt, følg dem strengt. Tekst i italics er en semantisk variabel som skal erstattes naturlig. Bruk user_context bare når den passer uten tvang. Ingen nummerering, kulepunkter, overskrifter eller forklaringer; returner én setning per linje.",
     "user_context": [],
-    "user_template": "Lag 2-3 (per hvert uttrykk) korte eksempelsetninger basert på dette norske innholdet:\n\n{content}\n\nBruk brukerens kontekst for situasjonsveiledning (IKKE tving inn disse ordene): {user_context}\n\nSetningene skal vise naturlig bruk av hovedordene/uttrykkene fra innholdet. Bruk konteksten for å forme realistiske situasjoner, men ikke tving inn kontekstordene direkte. Skriv setningene uten nummerering, hver på egen linje.",
+    "user_template": "Lag nøyaktig 2 korte eksempelsetninger totalt for hoveduttrykket i dette innholdet:\n\n{content}\n\nSituasjonskontekst, bare når naturlig: {user_context}",
     "api_settings": {
-      "max_completion_tokens": 2000
+      "max_completion_tokens": 600,
+      "reasoning_effort": "low",
+      "verbosity": "low"
     },
     "examples": [
       {
         "input": "å sette i gang",
         "user_context": [],
-        "output": "Teamet må **sette i gang** AI-prototypen før neste brukertest.\nUtvikleren **satte i gang** backend-tjenesten før frontend-arbeidet startet.\nHun har **satt i gang** et nytt React-prosjekt med JavaScript."
+        "output": "Teamet må **sette i gang** prototypen før neste brukertest.\nUtvikleren **satte i gang** backend-tjenesten før frontend-arbeidet startet."
       },
       {
         "input": "et sjakkbrett",
         "custom_instructions": "sjakk",
         "user_context": [],
-        "output": "Han studerte **sjakkbrettet** nøye før han flyttet dronningen.\n**Sjakkbrettet** var laget av tre med intarsiaarbeid.\nEtter turneringen pakket hun **sjakkbrettet** forsiktig i vesken.\nDe satte opp **sjakkbrettet** og forberedte seg på en lang kamp."
+        "output": "Han studerte **sjakkbrettet** nøye før han flyttet dronningen.\nEtter turneringen pakket hun **sjakkbrettet** forsiktig i vesken."
       }
     ]
   },
   "norwegian_linguistic_independent_review": {
     "description": "Run a clean-context independent review of complete Norwegian CardCraft output without rewriting it.",
-    "system_message": "Du er en uavhengig språkrevisor for moderne norsk bokmål. Vurder bare kontrakten, kildematerialet, den komplette kandidaten og den oppgitte korpusevidensen. Du har ingen generatorbegrunnelse eller tidligere samtalekontekst. Kontroller betydning, morfologi, grammatikk, naturlig bruk, kollokasjoner, register, pedagogisk egnethet, konsistens og JSON/Markdown/HTML-markører. Kontroller full fetmarkering av bøyde ordformer bare når artifact_kind er examples_text eller kontrakten uttrykkelig krever det. Sammenlign semantisk like varianter med samme korpusgrunnlag og foretrekk klart dominerende moderne former. Frekvens er et brukssignal, ikke en mekanisk terskel; manglende treff betyr ukjent, ikke ugyldig. Ikke omskriv kandidaten og ikke returner en forbedret tekst. Returner KUN gyldig JSON med candidate_sha256, verdict (PASS, REPAIR eller ESCALATE) og findings. Hvert funn skal ha span_id, category, severity (blocker, major, minor eller advisory), diagnosis, evidence, repair_direction og status=open. PASS er forbudt når et blocker- eller major-funn er åpent.",
+    "system_message": "Du er en uavhengig språkrevisor for moderne norsk bokmål. Vurder bare kontrakten, kildematerialet, den komplette kandidaten og den oppgitte korpusevidensen. Du har ingen generatorbegrunnelse eller tidligere samtalekontekst. Kontroller betydning, morfologi, grammatikk, naturlig bruk, kollokasjoner, register, pedagogisk egnethet, konsistens og JSON/Markdown/HTML-markører. Kontroller full fetmarkering av bøyde ordformer bare når artifact_kind er examples_text eller kontrakten uttrykkelig krever det. Sammenlign semantisk like varianter med samme korpusgrunnlag og foretrekk klart dominerende moderne former. Frekvens er et brukssignal, ikke en mekanisk terskel; manglende treff betyr ukjent, ikke ugyldig. Kalibrer severity strengt: blocker og major krever reell feil i mening, morfologi, grammatikk, struktur eller obligatorisk format; stilistisk klossethet uten meningsforvrengning er minor eller advisory. Bruk REPAIR bare når blocker- eller major-funn er åpne og kandidaten kan korrigeres entydig. Returner PASS når bare minor- eller advisory-funn gjenstår. Bruk ESCALATE bare når en trygg fullstendig korrigering krever manglende menneskelig avklaring eller ekstern evidens. Ikke omskriv kandidaten og ikke returner en forbedret tekst. Returner KUN gyldig JSON med candidate_sha256, verdict (PASS, REPAIR eller ESCALATE) og findings. Hvert funn skal ha span_id, category, severity (blocker, major, minor eller advisory), diagnosis, evidence, repair_direction og status=open. PASS er forbudt når et blocker- eller major-funn er åpent.",
     "user_template": "CONTRACT:\n{contract}\n\nARTIFACT RULE: contract.artifact_kind er autoritativ. word_stack_json skal forbli rå JSON uten Markdown. examples_text og description_text skal forbli ren linjeorientert tekst. anki_html skal forbli det komplette HTML-feltet med bare br-, b- og i-tagger; ordformoversikten skal ikke fetmarkeres med mindre kontrakten krever det.\n\nSOURCE CONTENT:\n{source_content}\n\nCANDIDATE SHA256:\n{candidate_sha256}\n\nCOMPLETE CANDIDATE:\n{candidate}\n\nEVIDENCE PACKET:\n{evidence}\n\nReturner kun reviewer-JSON. Ikke reparer teksten.",
     "api_settings": {
-      "max_completion_tokens": 2400,
+      "max_completion_tokens": 1200,
+      "verbosity": "low",
       "response_format": {
         "type": "json_object"
       }
@@ -195,7 +212,8 @@
     "system_message": "Reparer den komplette kandidaten etter de uavhengige funnene. Gjør den minste helhetlige endringen som lukker blocker- og major-funn. Bevar kontrakt, mening, målformer, JSON-struktur, linjer, Markdown/HTML-markører, semantiske variabler og brukerens kontekst. Ikke innfør nye fakta eller uvedkommende synonymer. Når kontrakten krever fetmarkering, skal Markdown omslutte hele den faktiske bøyde formen, for eksempel **foretrekker**, aldri **foretrekke**r. Denne reparasjonen er ikke en verifisering. Returner KUN gyldig JSON med feltet output som inneholder hele den reparerte kandidaten.",
     "user_template": "CONTRACT:\n{contract}\n\nARTIFACT RULE: contract.artifact_kind er autoritativ. word_stack_json skal forbli rå JSON uten Markdown. examples_text og description_text skal forbli ren linjeorientert tekst. anki_html skal forbli det komplette HTML-feltet med bare br-, b- og i-tagger; ikke fetmarker ordformoversikten uten uttrykkelig kontraktkrav.\n\nSOURCE CONTENT:\n{source_content}\n\nCURRENT CANDIDATE:\n{candidate}\n\nINDEPENDENT FINDINGS:\n{findings}\n\nReturner hele den reparerte kandidaten i output-feltet.",
     "api_settings": {
-      "max_completion_tokens": 2400,
+      "max_completion_tokens": 1600,
+      "verbosity": "low",
       "response_format": {
         "type": "json_object"
       }
@@ -204,10 +222,11 @@
   },
   "target_language_linguistic_independent_review": {
     "description": "Run a clean-context locale-specific review of a translated word stack without rewriting it.",
-    "system_message": "Act as an independent expert reviewer for the exact target locale named in CONTRACT. Judge only the verified Norwegian source, the complete translated candidate, the locale profile, and the supplied evidence. Check lexical meaning, part of speech, morphology, idiomaticity, register, locale consistency, schema parity, nulls, Unicode, and JSON integrity. Detect false friends, source-shaped syntax, calques, additions, omissions, and mismatched inflection chains. Do not rewrite the candidate. Do not claim external corpus or dictionary checks unless they appear in EVIDENCE. Return ONLY valid JSON with candidate_sha256, verdict (PASS, REPAIR or ESCALATE), and findings. Each finding must include span_id, category, severity (blocker, major, minor or advisory), diagnosis, evidence, repair_direction and status=open. PASS is forbidden while a blocker or major finding remains open.",
+    "system_message": "Act as an independent expert reviewer for the exact target locale named in CONTRACT. Judge only the verified Norwegian source, the complete translated candidate, the locale profile, and the supplied evidence. Check lexical meaning, part of speech, morphology, idiomaticity, register, locale consistency, schema parity, nulls, Unicode, and JSON integrity. Detect false friends, source-shaped syntax, calques, additions, omissions, and mismatched inflection chains. Calibrate severity strictly: blocker and major require a material error in meaning, morphology, grammar, schema or required format; awkward wording without meaning loss is minor or advisory. Use REPAIR only while blocker or major findings remain and the candidate can be corrected unambiguously. Return PASS when only minor or advisory findings remain. Use ESCALATE only when a safe complete correction requires missing human clarification or external evidence. Do not rewrite the candidate. Do not claim external corpus or dictionary checks unless they appear in EVIDENCE. Return ONLY valid JSON with candidate_sha256, verdict (PASS, REPAIR or ESCALATE), and findings. Each finding must include span_id, category, severity (blocker, major, minor or advisory), diagnosis, evidence, repair_direction and status=open. PASS is forbidden while a blocker or major finding remains open.",
     "user_template": "CONTRACT:\n{contract}\n\nVERIFIED NORWEGIAN SOURCE:\n{source_content}\n\nCANDIDATE SHA256:\n{candidate_sha256}\n\nCOMPLETE TARGET-LANGUAGE CANDIDATE:\n{candidate}\n\nEVIDENCE:\n{evidence}\n\nReturn only reviewer JSON. Do not repair the candidate.",
     "api_settings": {
-      "max_completion_tokens": 2400,
+      "max_completion_tokens": 1200,
+      "verbosity": "low",
       "response_format": {
         "type": "json_object"
       }
@@ -219,7 +238,8 @@
     "system_message": "Repair the complete target-language candidate according to the independent findings and the exact locale in CONTRACT. Make the smallest coherent change that closes blocker and major findings. Preserve source meaning, part of speech, the five-key JSON schema, field types, null values, Unicode and formatting constraints. Do not add explanations, labels, Markdown, HTML or code fences. This repair is not a verification. Return ONLY valid JSON with an output field containing the complete repaired candidate as a JSON string.",
     "user_template": "CONTRACT:\n{contract}\n\nVERIFIED NORWEGIAN SOURCE:\n{source_content}\n\nCURRENT TARGET-LANGUAGE CANDIDATE:\n{candidate}\n\nINDEPENDENT FINDINGS:\n{findings}\n\nReturn the complete repaired candidate in the output field.",
     "api_settings": {
-      "max_completion_tokens": 2400,
+      "max_completion_tokens": 1600,
+      "verbosity": "low",
       "response_format": {
         "type": "json_object"
       }

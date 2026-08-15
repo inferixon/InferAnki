@@ -104,6 +104,11 @@ def build_inferanki_contract(
     else:
         invariants.append("preserve the complete artifact format")
         technical_constraints = ["return only the requested complete artifact"]
+    if isinstance(source_content, dict) and source_content.get("output_limits"):
+        invariants.append(
+            "obey output_limits exactly: "
+            + json.dumps(source_content["output_limits"], ensure_ascii=False)
+        )
     return {
         "locale": "nb-NO",
         "language_variety": "modern Norwegian Bokmål",
@@ -219,7 +224,6 @@ def build_collocation_evidence_entries(corpus: Dict[str, Any]) -> List[Dict[str,
             "terms": terms,
             "window": corpus.get("window"),
             "sample_size": corpus.get("sample_size"),
-            "sample_document_ids": corpus.get("sample_document_ids", []),
         },
         "observation": {
             "matches": corpus.get("matches", []),

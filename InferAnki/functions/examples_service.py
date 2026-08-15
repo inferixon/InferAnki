@@ -1,7 +1,7 @@
 """Background-safe standalone Examples orchestration."""
 
 import re
-from typing import Any, Dict, Optional
+from typing import Any, Callable, Dict, Optional
 
 
 class ExamplesPipelineError(RuntimeError):
@@ -23,8 +23,13 @@ def build_examples_payload(
     config: Dict[str, Any],
     content: str,
     custom_instructions: Optional[str] = None,
+    progress: Optional[Callable[[str], None]] = None,
 ) -> str:
     """Generate, review, render, and verify standalone examples."""
+    def report(label: str) -> None:
+        if progress:
+            progress(label)
+
     if analyzer is None:
         raise ExamplesPipelineError("CardCraft AI not available")
     api_key = config.get("openai_api_key", "")
@@ -43,22 +48,19 @@ def build_examples_payload(
     if custom_instructions:
         user_message += f"\n\nADDITIONAL INSTRUCTIONS: {custom_instructions}"
 
-    corpus_evidence = analyzer.get_corpus_evidence(content)
-    collocation_evidence = analyzer.get_collocation_evidence(content)
-    user_message += analyzer.corpus_client.format_for_prompt(corpus_evidence)
-    user_message += analyzer.corpus_client.format_collocations_for_prompt(
-        collocation_evidence
-    )
-
     system_message = prompt.get("system_message", "")
     api_settings = prompt.get("api_settings", {})
     messages = [
         {"role": "system", "content": system_message},
         {"role": "user", "content": user_message},
     ]
+    report("Creating Examples")
     response, _usage = analyzer.openai_client.request_with_messages(
         messages,
-        custom_model=api_settings.get("model", analyzer.openai_client.model),
+        custom_model=api_settings.get(
+            "model",
+            config.get("openai_draft_model", analyzer.openai_client.model),
+        ),
         custom_temperature=api_settings.get("temperature"),
         custom_max_tokens=(
             api_settings.get("max_completion_tokens")
@@ -72,8 +74,6 @@ def build_examples_payload(
         {
             "system_message": system_message,
             "user_message": user_message,
-            "corpus_evidence": corpus_evidence,
-            "collocation_evidence": collocation_evidence,
             "api_settings": api_settings,
         },
         response,
@@ -82,17 +82,22 @@ def build_examples_payload(
     if not response:
         raise ExamplesPipelineError("No response from OpenAI")
 
-    reviewed = analyzer.review_examples_with_corpus(
-        content,
-        response,
-        "EXAMPLES_FROM_CONTENT_CORPUS_REVIEW",
-        custom_instructions,
-    )
-    normalized = normalize_examples_response(reviewed)
+    normalized = normalize_examples_response(response)
     rendered = re.sub(r"\*\*(.*?)\*\*", r"<b>\1</b>", normalized)
     rendered = rendered.replace("\n", "<br>")
-    return analyzer.verify_rendered_anki_field(
-        {"content": content, "custom_instructions": custom_instructions},
+    report("Reviewing Examples")
+    verified = analyzer.verify_rendered_anki_field(
+        {
+            "content": content,
+            "custom_instructions": custom_instructions,
+            "output_limits": {
+                "sentences": 2,
+                "max_words_per_sentence": 18,
+            },
+        },
         rendered,
         "EXAMPLES_FROM_CONTENT_RENDERED_QA",
     )
+    if len([line for line in re.split(r"<br\s*/?>", verified) if line.strip()]) != 2:
+        raise ExamplesPipelineError("Verified examples violated the two-sentence limit")
+    return verified

@@ -2,7 +2,7 @@
 
 AI-assisted Norwegian vocabulary tooling for the Anki Desktop card editor.
 
-Current development build: `0.6.8`.
+Current development build: `0.6.9`.
 
 ## Features
 
@@ -11,7 +11,7 @@ Current development build: `0.6.8`.
 - **TTS** – generates Norwegian audio through ElevenLabs and attaches it to the note.
 - **ChatGPT Assistant** – provides free-form chat, eight configurable quick prompts, clipboard actions, and session-local conversation history. Open it from the editor, the Anki toolbar, the Tools menu, or with `Ctrl+G`.
 
-CardCraft and Examples can use frequency and collocation evidence from the National Library of Norway DH-LAB corpus. Generated Norwegian and target-language content passes independent review and repair loops before it is written to the note. Long-running AI and TTS work runs outside the UI thread, and generated card fields are applied together only after the pipeline succeeds.
+CardCraft and Examples can use frequency and collocation evidence from the National Library of Norway DH-LAB corpus. Compact Luna drafts pass independent Terra review and repair loops before they are written to the note. Long-running operations use Anki's native progress dialog, and generated card fields are applied together only after the pipeline succeeds.
 
 ## Requirements
 
@@ -60,12 +60,15 @@ et sjakkbrett * use only chess-related situations
 | Setting | Purpose |
 | --- | --- |
 | `openai_default_model` | Shared OpenAI model; default is `gpt-5.6-terra` |
+| `openai_draft_model` | Fast model for compact drafts; default is `gpt-5.6-luna` |
 | `openai_reasoning_effort` | Shared reasoning level |
 | `openai_text_verbosity` | Shared response verbosity |
 | `field_1_response_lang` | Translation language written to field 1 |
 | `user_lang` | User-language value available to ChatGPT prompt templates |
 | `chatbot_max_history` | Number of completed message pairs retained per dialog |
 | `tts_enabled` | Enables or disables ElevenLabs TTS |
+| `tts_progress_threshold_chars` | Shows native TTS progress above this cleaned-text length |
+| `openai_usage_log_enabled` | Writes secret-free token usage telemetry |
 | `corpus_enabled` | Enables Norwegian corpus evidence |
 | `corpus_eval_enabled` | Enables corpus-backed review and repair loops |
 | `debug_mode` | Enables additional diagnostics |
@@ -93,6 +96,7 @@ Corpus behavior can be adjusted with the `corpus_*` settings in `config.json`.
 - Restart Anki after changing `config.json` or `prompts.json`.
 - CardCraft logs: `InferAnki/logs/convert-*.log`
 - Linguistic QA receipts: `InferAnki/logs/linguistic-qa-*.json`
+- Exact OpenAI usage: `InferAnki/logs/openai-usage.jsonl`
 - Increase `openai_timeout_seconds` in `config.json` if long requests time out.
 - Set `debug_mode` to `true` for more visible error dialogs.
 - API calls use your own OpenAI and ElevenLabs accounts and may incur provider charges.

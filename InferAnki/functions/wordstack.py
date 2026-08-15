@@ -102,7 +102,7 @@ class NorwegianWordAnalyzer:
     def _log_api_call(self, request_data, response_data, step_name=""):
         """Log API request and response to convert-datetime.log"""
         try:
-            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S_%f")
             log_file = os.path.join(self.log_dir, f"convert-{timestamp}.log")
             
             with open(log_file, 'a', encoding='utf-8') as f:
@@ -505,6 +505,7 @@ class NorwegianWordAnalyzer:
         evidence = []
         cycle = 1
         receipt_written = False
+        evidence_source = self._select_qa_evidence_source(source_content)
         try:
             for cycle in range(1, max_cycles + 1):
                 if not self._validate_qa_candidate(current, artifact_kind):
@@ -514,14 +515,21 @@ class NorwegianWordAnalyzer:
                 if evidence_override is not None:
                     evidence = list(evidence_override)
                 else:
-                    corpus = self.get_corpus_evidence(source_content, current)
+                    candidate_terms = self._extract_candidate_evidence_terms(current)
+                    corpus = self.get_corpus_evidence(
+                        evidence_source,
+                        candidate_terms,
+                    )
                     if corpus.get("status") != "ok":
                         raise LinguisticQABlockedError(
                             f"Corpus evidence is {corpus.get('status', 'unavailable')}"
                         )
                     evidence = build_evidence_entries(corpus)
                     if self.config.get("corpus_collocations_enabled", True):
-                        collocations = self.get_collocation_evidence(source_content)
+                        collocations = self.get_collocation_evidence(
+                            evidence_source,
+                            candidate_terms,
+                        )
                         if (
                             self.config.get("corpus_collocations_required", True)
                             and collocations.get("status") not in {"ok", "empty"}
@@ -576,8 +584,18 @@ class NorwegianWordAnalyzer:
                         step_name=step_name,
                     )
                     receipt_written = True
+                    diagnosis = next(
+                        (
+                            str(finding.get("diagnosis", "")).strip()
+                            for finding in findings
+                            if isinstance(finding, dict)
+                            and finding.get("diagnosis")
+                        ),
+                        "",
+                    )
+                    detail = f": {diagnosis[:240]}" if diagnosis else ""
                     raise LinguisticQABlockedError(
-                        "Linguistic QA requires human review"
+                        f"Linguistic QA requires human review{detail}"
                     )
                 current = self._run_linguistic_repair(
                     contract,
@@ -633,6 +651,32 @@ class NorwegianWordAnalyzer:
                 f"Linguistic QA failed: {type(error).__name__}"
             ) from error
 
+    @staticmethod
+    def _select_qa_evidence_source(source_content: Any) -> Any:
+        """Exclude contract metadata from lexical corpus queries."""
+        if isinstance(source_content, dict):
+            word_stack = source_content.get("word_stack")
+            if isinstance(word_stack, dict):
+                return word_stack
+        return source_content
+
+    @staticmethod
+    def _extract_candidate_evidence_terms(candidate: str) -> list:
+        """Extract only marked target forms from learner-facing candidates."""
+        if not isinstance(candidate, str):
+            return []
+        markdown = re.findall(r"\*\*([^*]+)\*\*", candidate)
+        html_terms = re.findall(
+            r"<b>(.*?)</b>",
+            candidate,
+            flags=re.IGNORECASE | re.DOTALL,
+        )
+        return [
+            re.sub(r"<[^>]+>", "", term).strip()
+            for term in markdown + html_terms
+            if re.sub(r"<[^>]+>", "", term).strip()
+        ]
+
     def review_examples_with_corpus(
         self,
         source_content: Any,
@@ -657,13 +701,31 @@ class NorwegianWordAnalyzer:
     ) -> Dict[str, Any]:
         """Independently verify the complete CardCraft word-stack JSON."""
         candidate = json.dumps(analysis, ensure_ascii=False, indent=2)
+        source = {
+            "input_word": input_word,
+            "required_schema": list(analysis.keys()),
+        }
+        contract = build_inferanki_contract(
+            "CardCraft morphology and modern Bokmål word-family selection",
+            source,
+            None,
+            "word_stack_json",
+        )
+        contract["invariants"].extend([
+            "validate the article and grammatical gender of every Norwegian noun",
+            "treat corpus surface frequency as usage evidence, not proof of part of speech",
+            "exclude marginal, ambiguous, or merely possible derivations unless they are useful modern lexical entries",
+            "prefer a compact semantically coherent word family over exhaustive derivation",
+            "partisipp may contain only a useful present participle and must not duplicate a verb paradigm form",
+        ])
         verified_text = self.run_linguistic_qa_gate(
-            {"input_word": input_word, "required_schema": list(analysis.keys())},
+            source,
             candidate,
             "STEP1C_WORD_STACK_LINGUISTIC_QA",
             None,
             "CardCraft morphology and modern Bokmål word-family selection",
             "word_stack_json",
+            contract_override=contract,
         )
         verified = json.loads(verified_text)
         if not self._validate_analysis(verified):
@@ -1005,7 +1067,11 @@ class NorwegianWordAnalyzer:
         except Exception as e:
             showCritical(f"Translation error: {str(e)}")
             return None
-    def get_description(self, word_stack: str) -> Optional[list]:
+    def get_description(
+        self,
+        word_stack: str,
+        run_qa: bool = True,
+    ) -> Optional[list]:
         """
         Get Norwegian description of the core concept(s) represented by the word stack
         
@@ -1068,14 +1134,15 @@ class NorwegianWordAnalyzer:
             }
             self._log_api_call(request_data, response, "STEP3_NORWEGIAN_DESCRIPTION")
             if response:
-                response = self.run_linguistic_qa_gate(
-                    word_stack,
-                    response,
-                    "STEP3B_DESCRIPTION_LINGUISTIC_QA",
-                    None,
-                    "Concise Norwegian learner-facing semantic explanation",
-                    "description_text",
-                )
+                if run_qa:
+                    response = self.run_linguistic_qa_gate(
+                        word_stack,
+                        response,
+                        "STEP3B_DESCRIPTION_LINGUISTIC_QA",
+                        None,
+                        "Concise Norwegian learner-facing semantic explanation",
+                        "description_text",
+                    )
                 # Try to parse response as JSON first (in case GPT returned array)
                 try:
                     import json
@@ -1118,10 +1185,91 @@ class NorwegianWordAnalyzer:
                 showCritical("No response from description API")
                 return None
             
+        except LinguisticQABlockedError:
+            raise
         except Exception as e:
             showCritical(f"Description error: {str(e)}")
             return None
-    def get_examples_simple(self, norwegian_json: Dict[str, Any]) -> Optional[str]:
+
+    def get_cardcraft_content(
+        self,
+        norwegian_word_stack: Dict[str, Any],
+    ) -> Optional[Dict[str, Any]]:
+        """Generate one compact definition-and-examples pack for CardCraft."""
+        try:
+            if not self.openai_client.enabled:
+                return None
+            prompt = self.prompts.get("cardcraft_content", {})
+            if not prompt:
+                return None
+
+            word_stack_json = json.dumps(
+                norwegian_word_stack,
+                ensure_ascii=False,
+                indent=2,
+            )
+            user_context = prompt.get("user_context", [])
+            user_message = prompt.get("user_template", "").format(
+                word_stack_json=word_stack_json,
+                user_context=user_context,
+            )
+
+            system_message = prompt.get("system_message", "")
+            api_settings = dict(prompt.get("api_settings", {}))
+            draft_model = self.config.get("openai_draft_model")
+            if draft_model and "model" not in api_settings:
+                api_settings["model"] = draft_model
+            response = self.openai_client.simple_request(
+                user_message,
+                system_message,
+                **self._build_api_override_kwargs(api_settings),
+            )
+            self._log_api_call(
+                {
+                    "system_message": system_message,
+                    "user_message": user_message,
+                    "api_settings": api_settings,
+                },
+                response,
+                "STEP3_CARDCRAFT_CONTENT",
+            )
+            if not response:
+                return None
+            parsed = json.loads(response)
+            if not isinstance(parsed, dict):
+                return None
+            definition = parsed.get("definition")
+            usage_examples = parsed.get("usage_examples")
+            context_sentences = parsed.get("context_sentences")
+            if not isinstance(definition, str) or not definition.strip():
+                return None
+            if not isinstance(usage_examples, list) or not usage_examples:
+                return None
+            if not isinstance(context_sentences, list) or not context_sentences:
+                return None
+            usage_examples = [
+                str(item).strip() for item in usage_examples if str(item).strip()
+            ][:2]
+            context_sentences = [
+                str(item).strip() for item in context_sentences if str(item).strip()
+            ][:2]
+            if not usage_examples or not context_sentences:
+                return None
+            definition = definition.strip()
+            if not definition.startswith("🔸"):
+                definition = f"🔸 {definition}"
+            return {
+                "definition": definition,
+                "usage_examples": usage_examples,
+                "context_sentences": context_sentences,
+            }
+        except (json.JSONDecodeError, TypeError, ValueError):
+            return None
+    def get_examples_simple(
+        self,
+        norwegian_json: Dict[str, Any],
+        run_qa: bool = True,
+    ) -> Optional[str]:
         """
         Generate simple usage examples for each word form in the Norwegian word stack
         
@@ -1215,11 +1363,12 @@ class NorwegianWordAnalyzer:
             }
             self._log_api_call(request_data, response, "STEP4_NORWEGIAN_EXAMPLES_SIMPLE")
             if response:
-                response = self.review_examples_with_corpus(
-                    norwegian_json,
-                    response,
-                    "STEP4B_CORPUS_REVIEW_SIMPLE_EXAMPLES",
-                )
+                if run_qa:
+                    response = self.review_examples_with_corpus(
+                        norwegian_json,
+                        response,
+                        "STEP4B_CORPUS_REVIEW_SIMPLE_EXAMPLES",
+                    )
                 # Apply hardcoded processing: make noen, ens, noe italic
                 processed_response = response.strip()
                 
@@ -1237,11 +1386,18 @@ class NorwegianWordAnalyzer:
                 showCritical("No response from examples API")
                 return None
             
+        except LinguisticQABlockedError:
+            raise
         except Exception as e:
             showCritical(f"Examples error: {str(e)}")
             return None
 
-    def get_examples_sentences(self, norwegian_json: Dict[str, Any], user_context: Optional[list] = None) -> Optional[str]:
+    def get_examples_sentences(
+        self,
+        norwegian_json: Dict[str, Any],
+        user_context: Optional[list] = None,
+        run_qa: bool = True,
+    ) -> Optional[str]:
         """
         Generate complete Norwegian sentences for each word form in the Norwegian word stack
         
@@ -1330,12 +1486,13 @@ class NorwegianWordAnalyzer:
             }
             self._log_api_call(request_data, response, "STEP5_NORWEGIAN_SENTENCES")
             if response:
-                response = self.review_examples_with_corpus(
-                    norwegian_json,
-                    response,
-                    "STEP5B_CORPUS_REVIEW_SENTENCES",
-                    user_context,
-                )
+                if run_qa:
+                    response = self.review_examples_with_corpus(
+                        norwegian_json,
+                        response,
+                        "STEP5B_CORPUS_REVIEW_SENTENCES",
+                        user_context,
+                    )
                 # Clean null patterns and return response text
                 cleaned_response = self._clean_null_patterns(response.strip())
                 cleaned_response = "\n".join(
@@ -1348,6 +1505,8 @@ class NorwegianWordAnalyzer:
                 showCritical("No response from sentences API")
                 return None
             
+        except LinguisticQABlockedError:
+            raise
         except Exception as e:
             showCritical(f"Sentences error: {str(e)}")
             return None

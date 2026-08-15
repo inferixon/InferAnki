@@ -14,8 +14,9 @@ class CorpusEvidenceClient:
 
     SOURCE_NAME = "Nasjonalbiblioteket DH-LAB reference_words"
     IGNORED_WORDS = {
-        "de", "den", "det", "ei", "en", "et", "har", "med", "mer", "mest",
-        "og", "som", "til", "å",
+        "adjektiv", "adverb", "de", "den", "det", "ei", "en", "et", "har",
+        "med", "mer", "mest", "og", "partisipp", "som", "substantiv", "til",
+        "verb", "å",
     }
 
     def __init__(self, config: Dict[str, Any]):

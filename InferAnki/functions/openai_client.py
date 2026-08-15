@@ -2,12 +2,14 @@
 # Simple HTTP-based OpenAI client without dependencies
 
 import json
+import os
 import urllib.request
 import urllib.parse
 import urllib.error
 import ssl
 import threading
 import time
+from datetime import datetime, timezone
 
 try:
     from aqt.utils import showInfo, showCritical # type: ignore
@@ -33,6 +35,14 @@ class OpenAIClient:
         self.reasoning_effort = config.get("openai_reasoning_effort", "medium")
         self.verbosity = config.get("openai_text_verbosity", "medium")
         self.base_url = "https://api.openai.com/v1"
+        self.usage_log_enabled = config.get("openai_usage_log_enabled", True)
+        self.usage_log_path = config.get(
+            "openai_usage_log_path",
+            os.path.abspath(
+                os.path.join(os.path.dirname(__file__), "..", "logs", "openai-usage.jsonl")
+            ),
+        )
+        self._usage_log_lock = threading.Lock()
 
         # Network timeout (seconds). Long responses (e.g., PROOFREAD diffs) can exceed 30s.
         # Keep it configurable but safe-by-default.
@@ -139,6 +149,31 @@ class OpenAIClient:
             except (TypeError, ValueError):
                 pass
         return min(8.0, self.retry_base_seconds * (2 ** attempt))
+
+    def _log_usage(self, request_data, response_data):
+        """Append secret-free exact Responses API usage telemetry."""
+        if not self.usage_log_enabled or not isinstance(response_data, dict):
+            return
+        usage = response_data.get("usage")
+        if not isinstance(usage, dict) or not usage:
+            return
+        reasoning = request_data.get("reasoning") or {}
+        text_settings = request_data.get("text") or {}
+        entry = {
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "response_id": response_data.get("id"),
+            "model": request_data.get("model"),
+            "reasoning_effort": reasoning.get("effort"),
+            "verbosity": text_settings.get("verbosity"),
+            "usage": usage,
+        }
+        try:
+            os.makedirs(os.path.dirname(self.usage_log_path), exist_ok=True)
+            with self._usage_log_lock:
+                with open(self.usage_log_path, "a", encoding="utf-8") as log_file:
+                    log_file.write(json.dumps(entry, ensure_ascii=False) + "\n")
+        except OSError:
+            pass
     
     def _make_request(self, endpoint, data):
         """Make HTTP request to OpenAI API"""
@@ -160,6 +195,7 @@ class OpenAIClient:
                     timeout=self.timeout_seconds,
                 ) as response:
                     response_data = json.loads(response.read().decode('utf-8'))
+                    self._log_usage(data, response_data)
                     return {"success": True, "data": response_data}
             except urllib.error.HTTPError as error:
                 try:
@@ -287,7 +323,9 @@ class OpenAIClient:
         custom_model=None,
         custom_temperature=None,
         custom_max_tokens=None,
-        response_format=None
+        response_format=None,
+        custom_reasoning_effort=None,
+        custom_verbosity=None,
     ):
         """Make a simple request to OpenAI with optional few-shot examples"""
         if not self.enabled:
@@ -311,7 +349,9 @@ class OpenAIClient:
             custom_model=custom_model,
             custom_temperature=custom_temperature,
             custom_max_tokens=custom_max_tokens,
-            response_format=response_format
+            response_format=response_format,
+            custom_reasoning_effort=custom_reasoning_effort,
+            custom_verbosity=custom_verbosity,
         )
 
         return message
@@ -324,7 +364,9 @@ class OpenAIClient:
         custom_model=None,
         custom_temperature=None,
         custom_max_tokens=None,
-        response_format=None
+        response_format=None,
+        custom_reasoning_effort=None,
+        custom_verbosity=None,
     ):
         """Make a simple request to OpenAI with optional few-shot examples, return response and usage info"""
         if not self.enabled:
@@ -348,7 +390,9 @@ class OpenAIClient:
             custom_model=custom_model,
             custom_temperature=custom_temperature,
             custom_max_tokens=custom_max_tokens,
-            response_format=response_format
+            response_format=response_format,
+            custom_reasoning_effort=custom_reasoning_effort,
+            custom_verbosity=custom_verbosity,
         )
 
         return message, usage_info
