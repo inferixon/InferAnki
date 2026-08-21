@@ -7,7 +7,7 @@ Current development build: `0.6.9`.
 ## Features
 
 - **CardCraft** – builds a Norwegian word-family card from one word, adds a definition, usage examples, contextual sentences, and a translation in the configured target language.
-- **Examples** – adds reviewed Norwegian examples to existing field 2 content. Append `* your instruction` to request a specific context.
+- **Examples** – generates two reviewed Norwegian examples from the source phrase, normalizes field 2 spacing, and fills an empty field 1 with a target-language translation. Append `* your instruction` to request a specific context.
 - **TTS** – generates Norwegian audio through ElevenLabs and attaches it to the note.
 - **ChatGPT Assistant** – provides free-form chat, eight configurable quick prompts, clipboard actions, and session-local conversation history. Open it from the editor, the Anki toolbar, the Tools menu, or with `Ctrl+G`.
 
@@ -43,7 +43,7 @@ Field names do not matter; the add-on uses field positions.
 Open the Add or Edit window and use the editor buttons:
 
 - `✨` – run CardCraft for the Norwegian word in field 2
-- `📝` – generate additional examples from field 2
+- `📝` – generate or replace examples from the source phrase in field 2
 - `👩🏼` – generate ElevenLabs audio from field 2
 - `☀️` – open ChatGPT Assistant
 

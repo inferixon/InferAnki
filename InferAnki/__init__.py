@@ -9,7 +9,13 @@ from datetime import datetime
 # Import addon modules
 from .functions.tts_handler import ElevenLabsTTSProcessor 
 from .functions.cardcraft_service import build_cardcraft_payload
-from .functions.examples_service import build_examples_payload
+from .functions.examples_service import (
+    build_examples_card_payload,
+    build_examples_payload,
+    extract_source_phrase_html,
+    is_html_field_empty,
+    join_source_and_examples,
+)
 from .functions.background_progress import (
     run_with_optional_progress,
     run_with_progress,
@@ -993,13 +999,14 @@ def handle_examples_command(editor):
         
         # Parse content for custom instructions (format: "content *instructions")
         content_parts = norsk_content.split('*', 1)
-        main_content = content_parts[0].strip()
+        main_content = extract_source_phrase_html(content_parts[0])
         custom_instructions = content_parts[1].strip() if len(content_parts) > 1 else None
         
         # Disable the examples button while processing
         disable_examples_button(editor)
         
-        original_norsk = note.fields[1]
+        original_fields = tuple(note.fields[:2])
+        translation_needed = is_html_field_empty(note.fields[0])
 
         def report_progress(label):
             """Update Anki's progress label on the UI thread."""
@@ -1009,26 +1016,32 @@ def handle_examples_command(editor):
 
         def build_examples():
             """Generate and verify examples without touching the note."""
-            return generate_examples_from_content(
+            return build_examples_card_payload(
+                WORD_ANALYZER,
+                CONFIG,
                 main_content,
                 custom_instructions,
                 report_progress,
+                translation_needed,
             )
 
         def finish_examples(future):
             """Append examples only if the original note remains unchanged."""
             try:
-                examples = future.result()
+                payload = future.result()
+                examples = payload["examples"]
                 if not examples:
                     showInfo("Could not generate examples.")
                     return
                 if not hasattr(editor, "note") or editor.note is not note:
                     showInfo("Examples were not applied because the active note changed.")
                     return
-                if note.fields[1] != original_norsk:
-                    showInfo("Examples were not applied because the Norsk field changed.")
+                if tuple(note.fields[:2]) != original_fields:
+                    showInfo("Examples were not applied because the card changed.")
                     return
-                note.fields[1] = norsk_content + "<br><br>" + examples
+                if translation_needed:
+                    note.fields[0] = payload["translation"]
+                note.fields[1] = join_source_and_examples(main_content, examples)
                 editor.loadNoteKeepingFocus()
                 editor.saveNow(lambda: None)
             except Exception as error:
