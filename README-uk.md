@@ -107,12 +107,11 @@ et sjakkbrett * використовуй лише шахові ситуації
 
 ## Скриншоти
 
-<p align="center">
-  <img src="images/CardCraft-01.jpg" alt="CardCraft" width="48%">
-  <img src="images/Examples-01.jpg" alt="Examples" width="48%">
-</p>
-
-![ChatGPT Assistant](images/Chatbot.jpg)
+<p><img src="images/CardCraft-01.jpg" alt="CardCraft input" width="100%"></p>
+<p><img src="images/CardCraft-02.jpg" alt="CardCraft result" width="100%"></p>
+<p><img src="images/Examples-01.jpg" alt="Examples input" width="100%"></p>
+<p><img src="images/Examples-02.jpg" alt="Examples result" width="100%"></p>
+<p><img src="images/Chatbot.jpg" alt="ChatGPT Assistant" width="100%"></p>
 
 ## Внесок у проєкт
 
