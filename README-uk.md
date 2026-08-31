@@ -29,7 +29,7 @@ CardCraft та Examples можуть використовувати частот
 3. Відкрий скопійований `InferAnki/config.json`.
 4. Заміни `YOUR_OPENAI_API_KEY_HERE` своїм API-ключем OpenAI.
 5. Якщо потрібен TTS, заміни `YOUR_ELEVENLABS_API_KEY_HERE` ключем ElevenLabs. Типова конфігурація використовує голос Emma.
-   Спробуйте ElevenLabs: [https://try.elevenlabs.io/l8ypk48ku2uk](https://try.elevenlabs.io/l8ypk48ku2uk)
+   [Спробуйте ElevenLabs](https://try.elevenlabs.io/l8ypk48ku2uk)
 6. Перезапусти Anki.
 
 InferAnki очікує щонайменше два поля нотатки:

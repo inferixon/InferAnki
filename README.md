@@ -29,7 +29,7 @@ The add-on is developed and tested on Windows 10/11. AnkiWeb and Anki mobile cli
 3. Open the copied `InferAnki/config.json`.
 4. Replace `YOUR_OPENAI_API_KEY_HERE` with your OpenAI API key.
 5. If using TTS, replace `YOUR_ELEVENLABS_API_KEY_HERE` with your ElevenLabs API key. The bundled configuration uses the Emma voice by default.
-   Try ElevenLabs: [https://try.elevenlabs.io/l8ypk48ku2uk](https://try.elevenlabs.io/l8ypk48ku2uk)
+   [Try ElevenLabs](https://try.elevenlabs.io/l8ypk48ku2uk)
 6. Restart Anki.
 
 InferAnki expects at least two note fields:
