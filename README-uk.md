@@ -107,9 +107,10 @@ et sjakkbrett * використовуй лише шахові ситуації
 
 ## Скриншоти
 
-![CardCraft](images/CardCraft-01.jpg)
-
-![Examples](images/Examples-01.jpg)
+<p align="center">
+  <img src="images/CardCraft-01.jpg" alt="CardCraft" width="48%">
+  <img src="images/Examples-01.jpg" alt="Examples" width="48%">
+</p>
 
 ![ChatGPT Assistant](images/Chatbot.jpg)
 
