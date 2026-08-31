@@ -39,8 +39,7 @@ class ElevenLabsTTSProcessor:
         
         # ElevenLabs TTS configuration
         self.api_key = config.get("elevenlabs_api_key", "")
-        self.voice_id = config.get("elevenlabs_voice_id", "")  # Will be set based on voice name
-        self.voice_name = config.get("tts_voice", "Emma")  # Default to Emma (Norwegian native)
+        self.voice_id = config.get("elevenlabs_voice_id", "")
         self.model = config.get("elevenlabs_model", "eleven_flash_v2_5")  # Flash v2.5 with Norwegian support
         self.language_code = config.get("elevenlabs_language_code", "no")  # ISO 639-1 code (no=Norwegian, en=English)
         self.stability = config.get("elevenlabs_stability", 0.75)  # Stable for consistent quality
@@ -56,31 +55,34 @@ class ElevenLabsTTSProcessor:
         self.enable_logging = config.get("elevenlabs_enable_logging", False)  # Disable for privacy
         self.seed = config.get("elevenlabs_seed", None)  # Deterministic generation
         
-        # Norwegian voice recommendations (including native speakers)
-        self.norwegian_voices = {
-            "Emma": "b3jcIbyC3BSnaRu8avEk",       # 🇳🇴 Native from Bergen! (recommended)
-            "Rachel": "21m00Tcm4TlvDq8ikWAM",     # Female, clear, versatile
-            "Domi": "AZnzlk1XvdvUeBnXmlld",       # Female, young, energetic  
-            "Bella": "EXAVITQu4vr4xnSDxMaL",      # Female, calm, mature
-            "Antoni": "ErXwobaYiN019PkySvjV",     # Male, deep, professional
-            "Josh": "TxGEqnHWrfWFTfGW9XjX",       # Male, young, friendly
-            "Arnold": "VR6AewLTigWG4xSOukaG",     # Male, mature, authoritative
-            "Adam": "pNInz6obpgDQGcFmaJgB",       # Male, deep, narrator
-            "Sam": "yoZ06aMxZJJ28mfd3POQ"         # Male, casual, conversational
-        }
-        
-        # Set voice ID based on voice name
-        if self.voice_name in self.norwegian_voices:
-            self.voice_id = self.norwegian_voices[self.voice_name]
-        elif not self.voice_id:
-            self.voice_id = self.norwegian_voices["Emma"]  # Default to Emma from Bergen
-          # Check API availability
+        # Check API availability
         if not REQUESTS_AVAILABLE:
             showCritical("ElevenLabs TTS requires 'requests' library")
             self.enabled = False
-        elif not self.api_key or self.api_key == "your-api-key-here":
+        elif not self._has_valid_api_key():
             if config.get("debug_mode", False):
                 showInfo("ElevenLabs API key not configured in config.json")
+        elif not self._has_valid_voice_id():
+            if config.get("debug_mode", False):
+                showInfo("ElevenLabs voice ID not configured in config.json")
+
+    def _has_valid_api_key(self):
+        """Return whether an explicit ElevenLabs API key is configured."""
+        if not isinstance(self.api_key, str):
+            return False
+        api_key = self.api_key.strip()
+        placeholders = {
+            "your-api-key-here",
+            "your_elevenlabs_api_key_here",
+        }
+        return bool(api_key) and api_key.casefold() not in placeholders
+
+    def _has_valid_voice_id(self):
+        """Return whether an explicit ElevenLabs voice ID is configured."""
+        if not isinstance(self.voice_id, str):
+            return False
+        voice_id = self.voice_id.strip()
+        return bool(voice_id) and voice_id.casefold() != "your_elevenlabs_voice_id_here"
                 
     def process_text_for_tts(self, text):
         """Process text with comprehensive HTML cleaning for Norwegian TTS"""
@@ -201,7 +203,12 @@ class ElevenLabsTTSProcessor:
     
     def create_audio_file(self, text, preprocessed=False):
         """Create MP3 audio file using ElevenLabs TTS"""
-        if not self.enabled or not REQUESTS_AVAILABLE:
+        if (
+            not self.enabled
+            or not REQUESTS_AVAILABLE
+            or not self._has_valid_api_key()
+            or not self._has_valid_voice_id()
+        ):
             return None
             
         try:
@@ -354,8 +361,12 @@ class ElevenLabsTTSProcessor:
             showCritical("ElevenLabs TTS requires 'requests' library")
             return False
         
-        if not self.api_key or self.api_key == "your-api-key-here":
+        if not self._has_valid_api_key():
             showCritical("ElevenLabs API key not configured. Please add 'elevenlabs_api_key' to config.json")
+            return False
+
+        if not self._has_valid_voice_id():
+            showCritical("ElevenLabs voice ID not configured. Please add 'elevenlabs_voice_id' to config.json")
             return False
             
         try:

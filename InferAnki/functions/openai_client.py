@@ -111,9 +111,14 @@ class OpenAIClient:
     
     def _check_availability(self):
         """Check if OpenAI is configured"""
-        if not self.api_key or self.api_key == "your-api-key-here":
+        if not isinstance(self.api_key, str):
             return False
-        return True
+        api_key = self.api_key.strip()
+        placeholders = {
+            "your-api-key-here",
+            "your_openai_api_key_here",
+        }
+        return bool(api_key) and api_key.casefold() not in placeholders
 
     def _get_timeout_seconds(self) -> int:
         """Get HTTP timeout in seconds from config with sane bounds."""

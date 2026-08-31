@@ -4,7 +4,6 @@
   "user_lang": "Ukrainian",
   "tts_engine": "elevenlabs",
   "tts_enabled": true,
-  "tts_voice": "Emma",
   "tts_max_chars": 40000,
   "tts_progress_threshold_chars": 50,
   "elevenlabs_api_key": "YOUR_ELEVENLABS_API_KEY_HERE",
