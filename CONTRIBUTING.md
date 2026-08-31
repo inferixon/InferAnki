@@ -28,7 +28,7 @@ Thank you for your interest in contributing to InferAnki! 🎉
 
 ## Development Setup
 
-1. Install Anki Desktop (Windows)
+1. Install Anki Desktop 25.02.5 or newer (Windows)
 2. Clone this repository
 3. Copy InferAnki folder to `%APPDATA%\Anki2\addons21\`
 4. Configure API keys in `config.json`

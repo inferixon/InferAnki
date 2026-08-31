@@ -11,11 +11,11 @@ Current development build: `0.6.9`.
 - **TTS** – generates Norwegian audio through ElevenLabs and attaches it to the note.
 - **ChatGPT Assistant** – provides free-form chat, eight configurable quick prompts, clipboard actions, and session-local conversation history. Open it from the editor, the Anki toolbar, the Tools menu, or with `Ctrl+G`.
 
-CardCraft and Examples can use frequency and collocation evidence from the National Library of Norway DH-LAB corpus. Compact Luna drafts pass independent Terra review and repair loops before they are written to the note. Long-running operations use Anki's native progress dialog, and generated card fields are applied together only after the pipeline succeeds.
+CardCraft and Examples can use frequency and collocation evidence from the National Library of Norway DH-LAB corpus. Compact draft stages use Luna, while independent review and repair stages use Terra before content is written to the note. Long-running operations use Anki's native progress dialog, and generated card fields are applied together only after the pipeline succeeds.
 
 ## Requirements
 
-- Anki Desktop `2.1.45` or newer
+- Anki Desktop `25.02.5` or newer
 - An internet connection for AI, corpus, and TTS requests
 - An OpenAI API key for CardCraft, Examples, and ChatGPT Assistant
 - An ElevenLabs API key only if TTS is used
@@ -29,6 +29,7 @@ The add-on is developed and tested on Windows 10/11. AnkiWeb and Anki mobile cli
 3. Open the copied `InferAnki/config.json`.
 4. Replace `YOUR_OPENAI_API_KEY_HERE` with your OpenAI API key.
 5. If using TTS, replace `YOUR_ELEVENLABS_API_KEY_HERE` with your ElevenLabs API key. The bundled configuration uses the Emma voice by default.
+   Try ElevenLabs: [https://try.elevenlabs.io/l8ypk48ku2uk](https://try.elevenlabs.io/l8ypk48ku2uk)
 6. Restart Anki.
 
 InferAnki expects at least two note fields:
@@ -63,6 +64,7 @@ et sjakkbrett * use only chess-related situations
 | `openai_draft_model` | Fast model for compact drafts; default is `gpt-5.6-luna` |
 | `openai_reasoning_effort` | Shared reasoning level |
 | `openai_text_verbosity` | Shared response verbosity |
+| `openai_timeout_seconds` | Optional OpenAI request timeout; defaults to 120 seconds and accepts 30–600 |
 | `field_1_response_lang` | Translation language written to field 1 |
 | `user_lang` | User-language value available to ChatGPT prompt templates |
 | `chatbot_max_history` | Number of completed message pairs retained per dialog |
@@ -97,7 +99,7 @@ Corpus behavior can be adjusted with the `corpus_*` settings in `config.json`.
 - CardCraft logs: `InferAnki/logs/convert-*.log`
 - Linguistic QA receipts: `InferAnki/logs/linguistic-qa-*.json`
 - Exact OpenAI usage: `InferAnki/logs/openai-usage.jsonl`
-- Increase `openai_timeout_seconds` in `config.json` if long requests time out.
+- Add or increase `openai_timeout_seconds` in `config.json` if long requests time out.
 - Set `debug_mode` to `true` for more visible error dialogs.
 - API calls use your own OpenAI and ElevenLabs accounts and may incur provider charges.
 
